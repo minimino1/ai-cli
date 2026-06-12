@@ -61,10 +61,6 @@ impl AnthropicProvider {
 
 #[async_trait]
 impl Provider for AnthropicProvider {
-    fn name(&self) -> &str {
-        "anthropic"
-    }
-
     fn models(&self) -> Vec<&str> {
         vec![
             "claude-sonnet-4-20250514",
@@ -137,16 +133,5 @@ impl Provider for AnthropicProvider {
                 total_tokens: u.input_tokens + u.output_tokens,
             }),
         })
-    }
-
-    async fn is_available(&self) -> bool {
-        self.client
-            .get(format!("{}/v1/messages", self.base_url))
-            .header("x-api-key", &self.api_key)
-            .header("anthropic-version", "2023-06-01")
-            .send()
-            .await
-            .map(|r| r.status().is_success())
-            .unwrap_or(false)
     }
 }

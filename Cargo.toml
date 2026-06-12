@@ -3,9 +3,9 @@ name = "ai-cli"
 version = "0.1.0"
 edition = "2021"
 description = "AI-powered CLI for code assistance - fix, explain, review, and more"
-authors = ["Your Name"]
+authors = ["minimino1"]
 license = "MIT"
-repository = "https://github.com/yourusername/ai-cli"
+repository = "https://github.com/minimino1/ai-cli"
 keywords = ["ai", "cli", "code", "assistant", "productivity"]
 categories = ["command-line-utilities", "development-tools"]
 
@@ -16,7 +16,6 @@ path = "src/main.rs"
 [dependencies]
 # CLI
 clap = { version = "4.5", features = ["derive", "env"] }
-clap_complete = "4.5"
 
 # Async
 tokio = { version = "1.0", features = ["full"] }
@@ -30,18 +29,12 @@ toml = "0.8"
 
 # Config and paths
 dirs = "5.0"
-chrono = { version = "0.4", features = ["serde"] }
 
 # Git integration
 git2 = "0.19"
 
-# Syntax highlighting
-syntect = "5.2"
-
 # Terminal
 console = "0.15"
-indicatif = "0.17"
-dialoguer = "0.11"
 colored = "2.1"
 
 # Error handling
@@ -51,14 +44,6 @@ thiserror = "2.0"
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-# Misc
-which = "7.0"
-shell-words = "1.1"
-tempfile = "3.14"
-
-[build-dependencies]
-clap_complete = "4.5"
 
 [profile.release]
 opt-level = 3

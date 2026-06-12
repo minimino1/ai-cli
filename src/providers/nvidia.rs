@@ -60,10 +60,6 @@ impl NvidiaProvider {
 
 #[async_trait]
 impl Provider for NvidiaProvider {
-    fn name(&self) -> &str {
-        "nvidia"
-    }
-
     fn models(&self) -> Vec<&str> {
         vec![
             "nvidia/llama-3.3-nemotron-super-49b-v1",
@@ -131,15 +127,5 @@ impl Provider for NvidiaProvider {
                 total_tokens: u.total_tokens,
             }),
         })
-    }
-
-    async fn is_available(&self) -> bool {
-        self.client
-            .get(format!("{}/models", self.base_url))
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .send()
-            .await
-            .map(|r| r.status().is_success())
-            .unwrap_or(false)
     }
 }

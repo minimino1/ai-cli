@@ -4,22 +4,12 @@ use std::path::{Path, PathBuf};
 
 pub struct GitContext {
     pub repo: Repository,
-    pub root: PathBuf,
 }
 
 impl GitContext {
     pub fn open(path: &Path) -> Result<Self> {
         let repo = Repository::discover(path)?;
-        let root = repo
-            .workdir()
-            .unwrap_or(path)
-            .to_path_buf();
-
-        Ok(GitContext { repo, root })
-    }
-
-    pub fn is_repo(path: &Path) -> bool {
-        Repository::discover(path).is_ok()
+        Ok(GitContext { repo })
     }
 
     pub fn get_staged_diff(&self) -> Result<String> {
@@ -72,40 +62,6 @@ impl GitContext {
         Ok(files)
     }
 
-    pub fn get_file_diff(&self, path: &Path) -> Result<String> {
-        let mut diff_options = DiffOptions::new();
-        diff_options.pathspec(path);
-
-        let head = self.repo.head()?;
-        let head_tree = head.peel_to_tree()?;
-
-        let diff = self.repo.diff_tree_to_workdir(Some(&head_tree), Some(&mut diff_options))?;
-
-        let mut diff_text = String::new();
-        diff.print(DiffFormat::Patch, |_delta, _hunk, line| {
-            diff_text.push_str(&String::from_utf8_lossy(line.content()));
-            true
-        })?;
-
-        Ok(diff_text)
-    }
-
-    pub fn get_repo_name(&self) -> String {
-        self.root
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string()
-    }
-
-    pub fn get_branch(&self) -> String {
-        self.repo
-            .head()
-            .ok()
-            .and_then(|h| h.shorthand().map(|s| s.to_string()))
-            .unwrap_or_else(|| "main".to_string())
-    }
-
     pub fn get_recent_commits(&self, count: usize) -> Result<Vec<CommitInfo>> {
         let mut revwalk = self.repo.revwalk()?;
         revwalk.set_sorting(git2::Sort::TIME)?;
@@ -123,11 +79,7 @@ impl GitContext {
                 .unwrap_or_default()
                 .to_string();
 
-            commits.push(CommitInfo {
-                id: id.to_string(),
-                summary,
-                author: commit.author().name().unwrap_or_default().to_string(),
-            });
+            commits.push(CommitInfo { summary });
         }
 
         Ok(commits)
@@ -142,7 +94,5 @@ pub struct StagedFile {
 
 #[derive(Debug)]
 pub struct CommitInfo {
-    pub id: String,
     pub summary: String,
-    pub author: String,
 }

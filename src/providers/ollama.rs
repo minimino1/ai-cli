@@ -35,18 +35,6 @@ struct OllamaMessage {
 struct OllamaResponse {
     message: OllamaMessage,
     model: String,
-    #[serde(default)]
-    done: bool,
-}
-
-#[derive(Deserialize)]
-struct OllamaModel {
-    name: String,
-}
-
-#[derive(Deserialize)]
-struct OllamaModelsResponse {
-    models: Vec<OllamaModel>,
 }
 
 impl OllamaProvider {
@@ -59,30 +47,10 @@ impl OllamaProvider {
             base_url,
         })
     }
-
-    pub async fn list_models(&self) -> Result<Vec<String>> {
-        let response = self
-            .client
-            .get(format!("{}/api/tags", self.base_url))
-            .send()
-            .await
-            .context("Failed to connect to Ollama")?;
-
-        if !response.status().is_success() {
-            anyhow::bail!("Failed to list Ollama models");
-        }
-
-        let models_response: OllamaModelsResponse = response.json().await?;
-        Ok(models_response.models.into_iter().map(|m| m.name).collect())
-    }
 }
 
 #[async_trait]
 impl Provider for OllamaProvider {
-    fn name(&self) -> &str {
-        "ollama"
-    }
-
     fn models(&self) -> Vec<&str> {
         vec![
             "llama3.2",
@@ -138,14 +106,5 @@ impl Provider for OllamaProvider {
             model: ollama_response.model,
             usage: None,
         })
-    }
-
-    async fn is_available(&self) -> bool {
-        self.client
-            .get(format!("{}/api/tags", self.base_url))
-            .send()
-            .await
-            .map(|r| r.status().is_success())
-            .unwrap_or(false)
     }
 }

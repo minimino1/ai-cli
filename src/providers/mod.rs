@@ -54,10 +54,8 @@ pub struct Usage {
 
 #[async_trait]
 pub trait Provider: Send + Sync {
-    fn name(&self) -> &str;
     fn models(&self) -> Vec<&str>;
     async fn chat(&self, request: ChatRequest) -> Result<ChatResponse>;
-    async fn is_available(&self) -> bool;
 }
 
 pub fn get_provider(name: &str, api_key: Option<&str>) -> Result<Box<dyn Provider>> {

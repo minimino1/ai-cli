@@ -84,7 +84,7 @@ pub async fn run(
         model: provider_config
             .model
             .clone()
-            .unwrap_or_else(|| "gpt-4o".to_string()),
+            .unwrap_or_else(|| config.default_model.clone()),
         max_tokens: provider_config.max_tokens,
         temperature: provider_config.temperature,
     };
