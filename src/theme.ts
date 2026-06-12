@@ -1,27 +1,42 @@
 export interface Theme {
   // Core colors
-  primary: string      // #fab283 (orange)
-  secondary: string    // #5c9cf5 (blue)
-  accent: string       // #9d7cd8 (purple)
-  error: string        // #e06c75 (red)
-  warning: string      // #f5a742 (orange)
-  success: string      // #7fd88f (green)
-  info: string         // #56b6c2 (cyan)
+  primary: string
+  secondary: string
+  accent: string
+  error: string
+  warning: string
+  success: string
+  info: string
 
   // Text colors
-  text: string         // #eeeeee
-  textMuted: string    // #808080
+  text: string
+  textMuted: string
 
   // Background colors
-  background: string       // #0a0a0a
-  backgroundPanel: string  // #141414
-  backgroundElement: string // #1e1e1e
-  backgroundMenu: string   // #1e1e1e
+  background: string
+  backgroundPanel: string
+  backgroundElement: string
+  backgroundMenu: string
 
   // Border colors
-  border: string          // #484848
-  borderActive: string    // #606060
-  borderSubtle: string    // #3c3c3c
+  border: string
+  borderActive: string
+  borderSubtle: string
+
+  // Diff colors
+  diffAdded: string
+  diffAddedBg: string
+  diffRemoved: string
+  diffRemovedBg: string
+  diffContext: string
+  diffHighlightAdded: string
+  diffHighlightRemoved: string
+
+  // Review colors
+  reviewError: string
+  reviewWarning: string
+  reviewInfo: string
+  reviewSuggestion: string
 }
 
 export const opencodeTheme: Theme = {
@@ -44,9 +59,23 @@ export const opencodeTheme: Theme = {
   border: '#484848',
   borderActive: '#606060',
   borderSubtle: '#3c3c3c',
+
+  // OpenCode diff colors
+  diffAdded: '#4fd6be',
+  diffAddedBg: '#20303b',
+  diffRemoved: '#c53b53',
+  diffRemovedBg: '#37222c',
+  diffContext: '#828bb8',
+  diffHighlightAdded: '#b8db87',
+  diffHighlightRemoved: '#e26a75',
+
+  // Review severity colors
+  reviewError: '#e06c75',
+  reviewWarning: '#f5a742',
+  reviewInfo: '#56b6c2',
+  reviewSuggestion: '#9d7cd8',
 }
 
-// Dark step scale from OpenCode
 export const darkScale = {
   step1: '#0a0a0a',
   step2: '#141414',

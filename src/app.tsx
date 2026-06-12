@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useCallback } from 'react'
 import { Box, Text, useInput, useApp } from 'ink'
 import TextInput from 'ink-text-input'
-import { opencodeTheme, type Theme } from './theme'
-import type { Message, Config } from './types'
+import { opencodeTheme } from './theme'
+import { ToolOutput } from './components/tool-output'
+import { parseCommand, createContext, commands } from './commands'
+import { sendToAI } from './providers/ai'
+import type { Message, MessagePart, Config } from './types'
 
 interface AppProps {
   config: Config
@@ -19,15 +22,12 @@ export const App: React.FC<AppProps> = ({ config }) => {
 
   // Handle keyboard shortcuts
   useInput((inputChar, key) => {
-    // Ctrl+C to exit
     if (key.ctrl && inputChar === 'c') {
       exit()
     }
-    // Ctrl+B to toggle sidebar
     if (key.ctrl && inputChar === 'b') {
       setSidebarOpen(prev => !prev)
     }
-    // Escape to clear input
     if (key.escape) {
       setInput('')
     }
@@ -37,10 +37,67 @@ export const App: React.FC<AppProps> = ({ config }) => {
   const handleSubmit = useCallback(async (value: string) => {
     if (!value.trim() || isLoading) return
 
+    const context = createContext(config, process.cwd())
+
+    // Check for slash command
+    const cmd = parseCommand(value)
+    if (cmd) {
+      // Handle /clear specially
+      if (cmd.command.name === 'clear') {
+        setMessages([])
+        setInput('')
+        return
+      }
+
+      // Handle /provider specially
+      if (cmd.command.name === 'provider') {
+        const result = await cmd.command.run(cmd.args, context)
+        if (result.length > 0) {
+          const systemMessage: Message = {
+            id: Date.now().toString(),
+            role: 'system',
+            parts: result,
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, systemMessage])
+        }
+        setInput('')
+        return
+      }
+
+      // Execute command
+      setIsLoading(true)
+      try {
+        const result = await cmd.command.run(cmd.args, context)
+        if (result.length > 0) {
+          const assistantMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            parts: result,
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, assistantMessage])
+        }
+      } catch (error) {
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'system',
+          parts: [{ type: 'text', text: `Error: ${error}` }],
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, errorMessage])
+      } finally {
+        setIsLoading(false)
+        setInput('')
+      }
+      return
+    }
+
+    // Regular message
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: value,
+      parts: [{ type: 'text', text: value }],
       timestamp: new Date(),
     }
 
@@ -52,24 +109,82 @@ export const App: React.FC<AppProps> = ({ config }) => {
       const provider = config.providers.find(p => p.id === config.activeProvider)
       if (!provider) throw new Error('Provider not found')
 
-      // TODO: Implement actual AI API call
-      // For now, simulate a response
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      const resultParts = await sendToAI([...messages, userMessage], provider)
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: `This is a simulated response from ${provider.name}. The AI API integration is not yet implemented.`,
+        parts: resultParts,
         timestamp: new Date(),
       }
 
       setMessages(prev => [...prev, assistantMessage])
     } catch (error) {
-      console.error('Error:', error)
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'system',
+        parts: [{ type: 'text', text: `Error: ${error}` }],
+        timestamp: new Date(),
+      }
+      setMessages(prev => [...prev, errorMessage])
     } finally {
       setIsLoading(false)
     }
-  }, [config, isLoading])
+  }, [config, messages, isLoading])
+
+  // Render a message
+  const renderMessage = (message: Message) => {
+    const isUser = message.role === 'user'
+    const isSystem = message.role === 'system'
+
+    return (
+      <Box key={message.id} flexDirection="column" marginBottom={1} paddingLeft={1}>
+        {/* Role indicator */}
+        {!isSystem && (
+          <Text
+            color={isUser ? theme.primary : theme.accent}
+            bold
+          >
+            {isUser ? '>' : '<'}
+          </Text>
+        )}
+
+        {/* Message parts */}
+        {message.parts.map((part, index) => (
+          <ToolOutput key={index} part={part} />
+        ))}
+      </Box>
+    )
+  }
+
+  // Autocomplete state
+  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [selectedSuggestion, setSelectedSuggestion] = useState(0)
+
+  const handleInputChange = (value: string) => {
+    setInput(value)
+
+    // Command autocomplete
+    if (value.startsWith('/')) {
+      const query = value.slice(1).toLowerCase()
+      const matching = commands
+        .filter(cmd => cmd.name.startsWith(query) || cmd.aliases?.some(a => a.startsWith(query)))
+        .map(cmd => `/${cmd.name}`)
+      setSuggestions(matching.slice(0, 5))
+      setSelectedSuggestion(0)
+    } else {
+      setSuggestions([])
+    }
+  }
+
+  const handleSubmitWithAutocomplete = (value: string) => {
+    if (suggestions.length > 0 && value === '') {
+      handleSubmit(suggestions[selectedSuggestion])
+    } else {
+      handleSubmit(value)
+    }
+    setSuggestions([])
+  }
 
   return (
     <Box flexDirection="row" width="100%" height="100%">
@@ -87,29 +202,28 @@ export const App: React.FC<AppProps> = ({ config }) => {
       >
         {/* Messages */}
         <Box flexDirection="column" flexGrow={1} overflow="hidden">
-          {messages.map((message) => (
-            <Box
-              key={message.id}
-              flexDirection="column"
-              marginBottom={1}
-              paddingLeft={1}
-            >
-              <Text
-                color={message.role === 'user' ? theme.primary : theme.accent}
-                bold
-              >
-                {message.role === 'user' ? '>' : '<'}
-              </Text>
-              <Text color={theme.text}>{message.content}</Text>
-            </Box>
-          ))}
+          {messages.map(renderMessage)}
 
           {isLoading && (
             <Box paddingLeft={1}>
-              <Text color={theme.textMuted}>Thinking...</Text>
+              <Text color={theme.info}>Thinking...</Text>
             </Box>
           )}
         </Box>
+
+        {/* Autocomplete suggestions */}
+        {suggestions.length > 0 && (
+          <Box flexDirection="column" paddingLeft={1} marginBottom={1}>
+            {suggestions.map((suggestion, index) => (
+              <Text
+                key={suggestion}
+                color={index === selectedSuggestion ? theme.primary : theme.textMuted}
+              >
+                {suggestion}
+              </Text>
+            ))}
+          </Box>
+        )}
 
         {/* Input area */}
         <Box
@@ -122,9 +236,9 @@ export const App: React.FC<AppProps> = ({ config }) => {
           <Text color={theme.primary} bold>› </Text>
           <TextInput
             value={input}
-            onChange={setInput}
-            onSubmit={handleSubmit}
-            placeholder="Ask anything..."
+            onChange={handleInputChange}
+            onSubmit={handleSubmitWithAutocomplete}
+            placeholder="Ask anything or type / for commands..."
           />
         </Box>
 
@@ -161,10 +275,14 @@ export const App: React.FC<AppProps> = ({ config }) => {
             <Text color={theme.textMuted}>Quick Actions</Text>
           </Box>
           <Box marginTop={1} flexDirection="column">
-            <Text color={theme.text}>/clear - Clear chat</Text>
+            <Text color={theme.text}>/review [file] - Review code</Text>
+            <Text color={theme.text}>/explain [file] - Explain code</Text>
+            <Text color={theme.text}>/fix [file] - Fix issues</Text>
+            <Text color={theme.text}>/file [path] - Show file</Text>
+            <Text color={theme.text}>/ls [path] - List files</Text>
             <Text color={theme.text}>/provider - Switch provider</Text>
+            <Text color={theme.text}>/clear - Clear chat</Text>
             <Text color={theme.text}>/help - Show help</Text>
-            <Text color={theme.text}>/exit - Exit</Text>
           </Box>
           <Box marginTop={2}>
             <Text color={theme.textMuted}>Keyboard Shortcuts</Text>
@@ -173,6 +291,7 @@ export const App: React.FC<AppProps> = ({ config }) => {
             <Text color={theme.text}>Ctrl+B - Toggle sidebar</Text>
             <Text color={theme.text}>Ctrl+C - Exit</Text>
             <Text color={theme.text}>Escape - Clear input</Text>
+            <Text color={theme.text}>Tab - Autocomplete</Text>
           </Box>
         </Box>
       )}
