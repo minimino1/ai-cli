@@ -50,6 +50,8 @@ pub struct Settings {
     pub color: bool,
     #[serde(default = "default_true")]
     pub git_context: bool,
+    #[serde(default)]
+    pub theme: String,
 }
 
 impl Default for Settings {
@@ -59,6 +61,7 @@ impl Default for Settings {
             verbose: false,
             color: true,
             git_context: true,
+            theme: "Dark".to_string(),
         }
     }
 }
@@ -128,6 +131,7 @@ impl Default for Config {
                 verbose: false,
                 color: true,
                 git_context: true,
+                theme: "Dark".to_string(),
             },
         }
     }

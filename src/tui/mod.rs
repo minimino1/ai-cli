@@ -1,6 +1,12 @@
 pub mod app;
-pub mod ui;
+pub mod clipboard;
+pub mod diff;
 pub mod handler;
+pub mod help;
+pub mod session;
+pub mod theme;
+pub mod highlight;
+pub mod ui;
 
 use anyhow::Result;
 use crossterm::{

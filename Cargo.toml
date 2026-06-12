@@ -40,6 +40,9 @@ colored = "2.1"
 ratatui = "0.29"
 crossterm = { version = "0.28", features = ["event-stream"] }
 
+# Syntax highlighting
+syntect = "5.0"
+
 # Error handling
 anyhow = "1.0"
 thiserror = "2.0"

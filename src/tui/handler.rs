@@ -2,8 +2,24 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use anyhow::Result;
 
 use super::app::{ActivePanel, App};
+use super::clipboard;
 
 pub async fn handle_key(app: &mut App, key: KeyEvent) -> Result<()> {
+    // Global help toggle (works in any panel)
+    if key.code == KeyCode::Char('?') && key.modifiers.is_empty() {
+        app.show_help = !app.show_help;
+        return Ok(());
+    }
+
+    // If help is shown, any key (except '?' which is handled above) closes it
+    if app.show_help && key.code != KeyCode::Char('?') {
+        app.show_help = false;
+        return Ok(());
+    }
+
+    // Clear session saved message on any key press
+    app.clear_session_saved_message();
+
     match key.code {
         // Quit
         KeyCode::Char('q') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -16,6 +32,11 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> Result<()> {
             }
         }
 
+        // Toggle theme
+        KeyCode::Char('t') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.cycle_theme();
+        }
+
         // Tab to cycle panels
         KeyCode::Tab => {
             app.active_panel = match app.active_panel {
@@ -23,6 +44,7 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> Result<()> {
                 ActivePanel::FileExplorer => ActivePanel::CommandPalette,
                 ActivePanel::CommandPalette => ActivePanel::History,
                 ActivePanel::History => ActivePanel::Chat,
+                ActivePanel::DiffViewer => ActivePanel::Chat,
             };
         }
 
@@ -36,6 +58,8 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> Result<()> {
                 handle_command_palette(app, key).await?;
             } else if app.active_panel == ActivePanel::History {
                 handle_history(app, key).await?;
+            } else if app.active_panel == ActivePanel::DiffViewer {
+                handle_diff_viewer(app, key).await?;
             }
         }
     }
@@ -45,9 +69,31 @@ pub async fn handle_key(app: &mut App, key: KeyEvent) -> Result<()> {
 
 async fn handle_chat_input(app: &mut App, key: KeyEvent) -> Result<()> {
     match key.code {
-        // Send message
-        KeyCode::Enter => {
+        // Send message (Enter without Shift or Ctrl)
+        KeyCode::Enter if !key.modifiers.contains(KeyModifiers::SHIFT) && !key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.send_message().await?;
+        }
+
+        // Insert newline (Shift+Enter or Ctrl+Enter)
+        KeyCode::Enter => {
+            app.input.insert(app.cursor_position, '\n');
+            app.cursor_position += 1;
+        }
+
+        // Copy last AI response to clipboard
+        KeyCode::Char('y') => {
+            if let Some(last_ai_msg) = app.messages.iter().rev().find(|msg| msg.role == "AI") {
+                match clipboard::copy_to_clipboard(&last_ai_msg.content) {
+                    Ok(_) => {
+                        app.status_message = "Copied to clipboard!".to_string();
+                    }
+                    Err(e) => {
+                        app.status_message = format!("Clipboard error: {}", e);
+                    }
+                }
+            } else {
+                app.status_message = "No AI response to copy".to_string();
+            }
         }
 
         // Quick actions
@@ -79,11 +125,43 @@ async fn handle_chat_input(app: &mut App, key: KeyEvent) -> Result<()> {
         KeyCode::Char('h') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.active_panel = ActivePanel::History;
         }
+        KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            if let Err(e) = app.save_session() {
+                app.status_message = format!("Save failed: {}", e);
+            }
+        }
+        KeyCode::Char('d') if app.input.is_empty() && !app.diffs.is_empty() => {
+            app.show_diff_viewer();
+        }
 
         // Clear input
         KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.input.clear();
             app.cursor_position = 0;
+        }
+
+        // Diff navigation
+        KeyCode::Char('n') => {
+            if !app.diffs.is_empty() {
+                app.next_diff();
+                app.active_panel = ActivePanel::DiffViewer;
+            }
+        }
+        KeyCode::Char('p') => {
+            if !app.diffs.is_empty() {
+                app.prev_diff();
+                app.active_panel = ActivePanel::DiffViewer;
+            }
+        }
+        KeyCode::Char('j') => {
+            if app.active_panel == ActivePanel::DiffViewer {
+                app.scroll_diff_down(1);
+            }
+        }
+        KeyCode::Char('k') => {
+            if app.active_panel == ActivePanel::DiffViewer {
+                app.scroll_diff_up(1);
+            }
         }
 
         // Input handling
@@ -175,6 +253,29 @@ async fn handle_history(app: &mut App, key: KeyEvent) -> Result<()> {
         }
         KeyCode::Enter => {
             app.select_history();
+        }
+        KeyCode::Esc => {
+            app.active_panel = ActivePanel::Chat;
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+async fn handle_diff_viewer(app: &mut App, key: KeyEvent) -> Result<()> {
+    match key.code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.scroll_diff_up(1);
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            app.scroll_diff_down(1);
+        }
+        KeyCode::Char('n') => {
+            app.next_diff();
+        }
+        KeyCode::Char('p') => {
+            app.prev_diff();
         }
         KeyCode::Esc => {
             app.active_panel = ActivePanel::Chat;

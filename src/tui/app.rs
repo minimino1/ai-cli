@@ -1,7 +1,11 @@
 use crate::config::Config;
 use crate::providers::{get_provider, ChatRequest, ChatResponse, Message, Role};
 use anyhow::Result;
+use ratatui::text::Line;
 use std::path::PathBuf;
+use super::highlight;
+use crate::tui::diff::Diff;
+use crate::tui::theme::Theme;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ActivePanel {
@@ -9,6 +13,7 @@ pub enum ActivePanel {
     FileExplorer,
     CommandPalette,
     History,
+    DiffViewer,
 }
 
 #[derive(Debug, Clone)]
@@ -16,6 +21,7 @@ pub struct ChatMessage {
     pub role: String,
     pub content: String,
     pub timestamp: String,
+    pub highlighted_lines: Vec<Line<'static>>,
 }
 
 #[derive(Debug, Clone)]
@@ -40,6 +46,14 @@ pub struct App {
     pub config: Config,
     pub is_loading: bool,
     pub status_message: String,
+    pub diffs: Vec<Diff>,
+    pub current_diff_index: usize,
+    pub diff_scroll: usize,
+    pub session_saved_message: Option<String>,
+    pub token_count: usize,
+    pub current_theme: Theme,
+    pub current_theme_index: usize,
+    pub show_help: bool,
 }
 
 impl App {
@@ -59,6 +73,15 @@ impl App {
 
         let files = list_current_dir()?;
 
+        // Initialize theme from config or default to dark
+        let themes = Theme::presets();
+        let theme_name = &config.settings.theme;
+        let current_theme_index = themes
+            .iter()
+            .position(|t| t.name.eq_ignore_ascii_case(theme_name))
+            .unwrap_or(0); // Default to dark if not found
+        let current_theme = themes[current_theme_index].clone();
+
         Ok(App {
             should_quit: false,
             active_panel: ActivePanel::Chat,
@@ -74,6 +97,14 @@ impl App {
             config: config.clone(),
             is_loading: false,
             status_message: "Ready".to_string(),
+            diffs: Vec::new(),
+            current_diff_index: 0,
+            diff_scroll: 0,
+            session_saved_message: None,
+            token_count: 0,
+            current_theme,
+            current_theme_index,
+            show_help: false,
         })
     }
 
@@ -84,10 +115,13 @@ impl App {
         }
 
         // Add user message
+        let content = input.clone();
+        let highlighted_lines = highlight::highlight_markdown(&content);
         self.messages.push(ChatMessage {
             role: "You".to_string(),
-            content: input.clone(),
+            content,
             timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+            highlighted_lines,
         });
 
         // Add to history
@@ -108,18 +142,31 @@ impl App {
 
         match response {
             Ok(response) => {
+                // Estimate tokens: ~4 chars per token
+                let tokens = response.content.len() / 4;
+                self.token_count += tokens;
+
+                let content = response.content;
+                let highlighted_lines = highlight::highlight_markdown(&content);
                 self.messages.push(ChatMessage {
                     role: "AI".to_string(),
-                    content: response.content,
+                    content,
                     timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+                    highlighted_lines,
                 });
                 self.status_message = "Ready".to_string();
+
+                // Extract diffs from AI response
+                self.extract_diffs();
             }
             Err(e) => {
+                let content = format!("Failed: {}", e);
+                let highlighted_lines = highlight::highlight_markdown(&content);
                 self.messages.push(ChatMessage {
                     role: "Error".to_string(),
-                    content: format!("Failed: {}", e),
+                    content,
                     timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+                    highlighted_lines,
                 });
                 self.status_message = format!("Error: {}", e);
             }
@@ -244,6 +291,79 @@ impl App {
             }
         }
         Ok(())
+    }
+
+    pub fn extract_diffs(&mut self) {
+        use crate::tui::diff::find_diffs_in_text;
+
+        self.diffs.clear();
+        for msg in &self.messages {
+            if msg.role == "AI" {
+                let diffs = find_diffs_in_text(&msg.content);
+                if !diffs.is_empty() {
+                    self.diffs.extend(diffs);
+                }
+            }
+        }
+
+        if !self.diffs.is_empty() {
+            self.current_diff_index = 0;
+            self.diff_scroll = 0;
+        }
+    }
+
+    pub fn next_diff(&mut self) {
+        if !self.diffs.is_empty() {
+            self.current_diff_index = (self.current_diff_index + 1) % self.diffs.len();
+            self.diff_scroll = 0;
+        }
+    }
+
+    pub fn prev_diff(&mut self) {
+        if !self.diffs.is_empty() {
+            self.current_diff_index = if self.current_diff_index == 0 {
+                self.diffs.len() - 1
+            } else {
+                self.current_diff_index - 1
+            };
+            self.diff_scroll = 0;
+        }
+    }
+
+    pub fn scroll_diff_down(&mut self, amount: usize) {
+        if !self.diffs.is_empty() && self.current_diff_index < self.diffs.len() {
+            let diff = &self.diffs[self.current_diff_index];
+            let max_scroll = diff.all_lines().len().saturating_sub(1);
+            self.diff_scroll = (self.diff_scroll + amount).min(max_scroll);
+        }
+    }
+
+    pub fn scroll_diff_up(&mut self, amount: usize) {
+        self.diff_scroll = self.diff_scroll.saturating_sub(amount);
+    }
+
+    pub fn show_diff_viewer(&mut self) {
+        if !self.diffs.is_empty() {
+            self.active_panel = ActivePanel::DiffViewer;
+        }
+    }
+
+    pub fn save_session(&mut self) -> Result<PathBuf> {
+        use crate::tui::session::save_session;
+
+        let path = save_session(&self.messages)?;
+        self.session_saved_message = Some(format!("Session saved to: {}", path.display()));
+        Ok(path)
+    }
+
+    pub fn clear_session_saved_message(&mut self) {
+        self.session_saved_message = None;
+    }
+
+    pub fn cycle_theme(&mut self) {
+        let themes = Theme::presets();
+        self.current_theme_index = (self.current_theme_index + 1) % themes.len();
+        self.current_theme = themes[self.current_theme_index].clone();
     }
 }
 
