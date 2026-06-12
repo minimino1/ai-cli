@@ -45,9 +45,9 @@ struct OpenAIUsage {
 impl OpenAIProvider {
     pub fn new(api_key: Option<&str>) -> Result<Self> {
         let api_key = api_key
+            .map(|s| s.to_string())
             .or_else(|| std::env::var("OPENAI_API_KEY").ok())
-            .context("OpenAI API key not found. Set OPENAI_API_KEY or use 'ai config apikey openai --key YOUR_KEY'")?
-            .to_string();
+            .context("OpenAI API key not found. Set OPENAI_API_KEY or use 'ai config apikey openai --key YOUR_KEY'")?;
 
         Ok(OpenAIProvider {
             client: Client::new(),
@@ -83,8 +83,9 @@ impl Provider for OpenAIProvider {
             })
             .collect();
 
+        let model = request.model.clone();
         let body = OpenAIRequest {
-            model: request.model,
+            model: model.clone(),
             messages,
             max_tokens: request.max_tokens,
             temperature: request.temperature,
@@ -118,7 +119,7 @@ impl Provider for OpenAIProvider {
 
         Ok(ChatResponse {
             content,
-            model: request.model,
+            model,
             usage: openai_response.usage.map(|u| Usage {
                 prompt_tokens: u.prompt_tokens,
                 completion_tokens: u.completion_tokens,

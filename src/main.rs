@@ -7,7 +7,7 @@ mod utils;
 
 use anyhow::Result;
 use clap::Parser;
-use cli::{Cli, Commands};
+use cli::Cli;
 use config::Config;
 
 #[tokio::main]

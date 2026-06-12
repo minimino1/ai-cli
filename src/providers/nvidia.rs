@@ -46,9 +46,9 @@ struct NvidiaUsage {
 impl NvidiaProvider {
     pub fn new(api_key: Option<&str>) -> Result<Self> {
         let api_key = api_key
+            .map(|s| s.to_string())
             .or_else(|| std::env::var("NVIDIA_API_KEY").ok())
-            .context("NVIDIA API key not found. Set NVIDIA_API_KEY or use 'ai config apikey nvidia --key YOUR_KEY'")?
-            .to_string();
+            .context("NVIDIA API key not found. Set NVIDIA_API_KEY or use 'ai config apikey nvidia --key YOUR_KEY'")?;
 
         Ok(NvidiaProvider {
             client: Client::new(),
@@ -85,8 +85,9 @@ impl Provider for NvidiaProvider {
             })
             .collect();
 
+        let model = request.model.clone();
         let body = NvidiaRequest {
-            model: request.model,
+            model: model.clone(),
             messages,
             max_tokens: request.max_tokens,
             temperature: request.temperature,
@@ -121,7 +122,7 @@ impl Provider for NvidiaProvider {
 
         Ok(ChatResponse {
             content,
-            model: request.model,
+            model,
             usage: nvidia_response.usage.map(|u| Usage {
                 prompt_tokens: u.prompt_tokens,
                 completion_tokens: u.completion_tokens,

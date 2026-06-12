@@ -73,6 +73,7 @@ async fn handle_config(action: ConfigAction) -> Result<()> {
         }
         ConfigAction::Set { key, value } => {
             let mut config = Config::load(&None)?;
+            let key_clone = key.clone();
             match key.as_str() {
                 "default_provider" => config.default_provider = value,
                 "default_model" => config.default_model = value,
@@ -83,7 +84,7 @@ async fn handle_config(action: ConfigAction) -> Result<()> {
                 _ => anyhow::bail!("Unknown config key: {}", key),
             }
             config.save(&None)?;
-            println!("Config updated: {} = {}", key, value);
+            println!("Config updated: {}", key_clone);
             Ok(())
         }
         ConfigAction::ApiKey { provider, key } => {

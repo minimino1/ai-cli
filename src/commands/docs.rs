@@ -1,9 +1,9 @@
 use super::*;
 use crate::providers::{ChatRequest, Message, Role};
-use crate::utils::{detect_language, extract_code_block, print_error, print_info, read_file_content};
+use crate::utils::{detect_language, extract_code_block, print_info, read_file_content};
 use anyhow::Result;
 use console::style;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub async fn run(
     config: &Config,

@@ -47,9 +47,9 @@ struct AnthropicUsage {
 impl AnthropicProvider {
     pub fn new(api_key: Option<&str>) -> Result<Self> {
         let api_key = api_key
+            .map(|s| s.to_string())
             .or_else(|| std::env::var("ANTHROPIC_API_KEY").ok())
-            .context("Anthropic API key not found. Set ANTHROPIC_API_KEY or use 'ai config apikey anthropic --key YOUR_KEY'")?
-            .to_string();
+            .context("Anthropic API key not found. Set ANTHROPIC_API_KEY or use 'ai config apikey anthropic --key YOUR_KEY'")?;
 
         Ok(AnthropicProvider {
             client: Client::new(),
@@ -92,8 +92,9 @@ impl Provider for AnthropicProvider {
             }
         }
 
+        let model = request.model.clone();
         let body = AnthropicRequest {
-            model: request.model,
+            model: model.clone(),
             max_tokens: request.max_tokens.unwrap_or(4096),
             messages,
             system: system_message,
@@ -129,7 +130,7 @@ impl Provider for AnthropicProvider {
 
         Ok(ChatResponse {
             content,
-            model: request.model,
+            model,
             usage: anthropic_response.usage.map(|u| Usage {
                 prompt_tokens: u.input_tokens,
                 completion_tokens: u.output_tokens,

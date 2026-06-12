@@ -1,6 +1,6 @@
 use super::*;
 use crate::providers::{ChatRequest, Message, Role};
-use crate::utils::{print_error, print_info};
+use crate::utils::print_info;
 use anyhow::Result;
 use console::style;
 

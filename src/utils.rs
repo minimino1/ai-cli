@@ -23,7 +23,7 @@ pub fn read_input(prompt: &str) -> Result<String> {
 
 pub fn confirm(prompt: &str) -> Result<bool> {
     eprint!("{} [y/N] ", prompt);
-    let term = Term::stdout();
+    let _term = Term::stdout();
     let mut buffer = String::new();
     io::stdin().read_line(&mut buffer)?;
     Ok(buffer.trim().to_lowercase() == "y")
@@ -77,7 +77,6 @@ pub fn detect_language(path: &Path) -> String {
         Some("md") => "markdown",
         Some("xml") => "xml",
         Some("proto") => "protobuf",
-        Some("rs") => "rust",
         Some("dart") => "dart",
         Some("lua") => "lua",
         Some("r") => "r",

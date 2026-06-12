@@ -32,22 +32,15 @@ impl GitContext {
         Ok(diff_text)
     }
 
-    fn get_staged_diff_internal(&self) -> Result<git2::Diff> {
-        let head = self.repo.find_commit(
-            self.repo
-                .head()
-                .and_then(|h| h.target().ok_or_else(|| git2::Error::from_str("no HEAD")))
-                .unwrap_or_else(|_| self.repo.find_blob(0, b"").unwrap().id()),
-        )?;
-
-        let mut index = self.repo.index()?;
-        let tree = head.tree().ok();
-        let index_tree = index.write_tree()?;
+    fn get_staged_diff_internal(&self) -> Result<git2::Diff<'_>> {
+        let head = self.repo.head()?;
+        let head_tree = head.peel_to_tree()?;
+        let index = self.repo.index()?;
 
         let mut diff_options = DiffOptions::new();
         let diff = self.repo.diff_tree_to_index(
-            tree.as_ref(),
-            Some(&self.repo.find_tree(index_tree)?),
+            Some(&head_tree),
+            Some(&index),
             Some(&mut diff_options),
         )?;
 
@@ -86,7 +79,7 @@ impl GitContext {
         let head = self.repo.head()?;
         let head_tree = head.peel_to_tree()?;
 
-        let mut diff = self.repo.diff_tree_to_workdir(Some(&head_tree), Some(&mut diff_options))?;
+        let diff = self.repo.diff_tree_to_workdir(Some(&head_tree), Some(&mut diff_options))?;
 
         let mut diff_text = String::new();
         diff.print(DiffFormat::Patch, |_delta, _hunk, line| {
