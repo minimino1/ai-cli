@@ -225,3 +225,95 @@ export async function gitBranch(): Promise<string> {
     return line
   }).join('\n')
 }
+
+// ─── Git Create Branch ───────────────────────────────────────────────
+export async function gitCreateBranch(name: string): Promise<string> {
+  if (!name.trim()) {
+    return `${colors.yellow}Usage: git branch <name>${colors.reset}`
+  }
+
+  const result = await runGit(['branch', name])
+
+  if (!result.success) {
+    return `${colors.red}Error:${colors.reset} ${result.stderr}`
+  }
+
+  return `${colors.green}✓ Created branch '${name}'${colors.reset}`
+}
+
+// ─── Git Checkout ─────────────────────────────────────────────────────
+export async function gitCheckout(branch: string): Promise<string> {
+  if (!branch.trim()) {
+    return `${colors.yellow}Usage: git checkout <branch>${colors.reset}`
+  }
+
+  const result = await runGit(['checkout', branch])
+
+  if (!result.success) {
+    return `${colors.red}Error:${colors.reset} ${result.stderr}`
+  }
+
+  return `${colors.green}✓ Switched to branch '${branch}'${colors.reset}\n${result.stdout}`
+}
+
+// ─── Git Merge ───────────────────────────────────────────────────────
+export async function gitMerge(branch: string): Promise<string> {
+  if (!branch.trim()) {
+    return `${colors.yellow}Usage: git merge <branch>${colors.reset}`
+  }
+
+  const result = await runGit(['merge', branch])
+
+  if (!result.success) {
+    return `${colors.red}Error:${colors.reset} ${result.stderr}`
+  }
+
+  return `${colors.green}✓ Merged branch '${branch}'${colors.reset}\n${result.stdout}`
+}
+
+// ─── Git Rebase ──────────────────────────────────────────────────────
+export async function gitRebase(branch: string): Promise<string> {
+  if (!branch.trim()) {
+    return `${colors.yellow}Usage: git rebase <branch>${colors.reset}`
+  }
+
+  const result = await runGit(['rebase', branch])
+
+  if (!result.success) {
+    return `${colors.red}Error:${colors.reset} ${result.stderr}`
+  }
+
+  return `${colors.green}✓ Rebased onto branch '${branch}'${colors.reset}\n${result.stdout}`
+}
+
+// ─── Git Delete Branch ───────────────────────────────────────────────
+export async function gitDeleteBranch(name: string, force: boolean = false): Promise<string> {
+  if (!name.trim()) {
+    return `${colors.yellow}Usage: git branch -d <branch>${colors.reset}`
+  }
+
+  const args = ['branch', force ? '-D' : '-d', name]
+  const result = await runGit(args)
+
+  if (!result.success) {
+    return `${colors.red}Error:${colors.reset} ${result.stderr}`
+  }
+
+  return `${colors.green}✓ Deleted branch '${name}'${colors.reset}`
+}
+
+// ─── Git Rename Branch ───────────────────────────────────────────────
+export async function gitRenameBranch(oldName: string, newName: string): Promise<string> {
+  if (!oldName.trim() || !newName.trim()) {
+    return `${colors.yellow}Usage: git branch -m <old> <new>${colors.reset}`
+  }
+
+  const result = await runGit(['branch', '-m', oldName, newName])
+
+  if (!result.success) {
+    return `${colors.red}Error:${colors.reset} ${result.stderr}`
+  }
+
+  return `${colors.green}✓ Renamed branch '${oldName}' to '${newName}'${colors.reset}`
+}
+

@@ -1,769 +1,961 @@
 # Command Reference
 
-This document provides a complete reference for all slash commands available in ai-cli.
-
-## Command Categories
-
-Commands are organized into the following categories:
-
-- **AI Commands** - Interact with AI providers
-- **File Commands** - Browse, view, and edit files
-- **Git Commands** - Git operations
-- **Shell Commands** - Execute shell commands and code
-- **Session Commands** - Manage chat sessions
-- **Editor Commands** - Editor and environment controls
-
-## Command Syntax
-
-```
-/command [arguments] [options]
-```
-
-- Commands are case-insensitive
-- Use Tab for autocomplete
-- Some commands have aliases (shorter versions)
-
----
+ai-cli provides 50+ slash commands organized into categories. All commands start with `/` and support tab completion.
 
 ## AI Commands
 
-### `/review` (alias: `rv`)
+### `/review [file]`
+Review code for quality, security, and best practices.
 
-Review code for issues, bugs, and best practices.
-
-**Syntax:**
-```
-/review [file]
-```
+**Aliases:** `/r`
 
 **Arguments:**
-- `file` (optional) - Path to file to review. If omitted, reviews the last code block in chat.
+- `file` (optional) - Path to file to review. If omitted, reviews current buffer.
 
 **Examples:**
 ```
-/review src/app.tsx
+/review src/index.ts
+/r main.py
 /review
 ```
 
-**Description:**
-Sends the specified file (or last code block) to the AI for comprehensive code review. The AI analyzes for:
-- Potential bugs and errors
-- Security vulnerabilities
-- Performance issues
-- Code style and best practices
+**Output:** Structured review with sections:
+- Summary
+- Issues found (critical, warning, info)
 - Suggestions for improvement
+- Code snippets with explanations
 
 ---
 
-### `/explain` (alias: `e`)
+### `/explain [code]`
+Explain code in plain language.
 
-Explain how code works.
-
-**Syntax:**
-```
-/explain [file]
-```
+**Aliases:** `/e`
 
 **Arguments:**
-- `file` (optional) - Path to file to explain. If omitted, explains the last code block in chat.
+- `code` (optional) - Code to explain. If omitted, explains selected text or current buffer.
 
 **Examples:**
 ```
-/explain src/commands.ts
+/explain function calculateTotal() { return a + b; }
+/e "useEffect(() => { fetchData(); }, [])"
 /explain
 ```
 
-**Description:**
-Requests the AI to provide a detailed explanation of the specified code. The explanation includes:
-- Overall purpose and functionality
-- Line-by-line breakdown
-- Key concepts and patterns used
-- Potential edge cases
+**Output:** Natural language explanation of what the code does, how it works, and any potential issues.
 
 ---
 
-### `/fix` (alias: `f`)
+### `/fix [issue]`
+Fix code issues automatically.
 
-Fix issues in code.
-
-**Syntax:**
-```
-/fix [file]
-```
+**Aliases:** `/f`
 
 **Arguments:**
-- `file` (optional) - Path to file to fix. If omitted, fixes the last code block in chat.
+- `issue` (optional) - Description of the issue to fix. If omitted, fixes issues from last review.
 
 **Examples:**
 ```
-/fix src/utils/validation.ts
+/fix memory leak in processData()
+/fix "unused variable"
 /fix
 ```
 
-**Description:**
-Asks the AI to identify and fix problems in the code. Returns corrected code with explanations of changes made.
-
----
-
-### `/provider` (alias: `model`)
-
-Switch AI provider or model.
-
-**Syntax:**
-```
-/provider [provider] [model]
-```
-
-**Arguments:**
-- `provider` (optional) - Provider ID: `nvidia`, `openai`, `anthropic`, `ollama`
-- `model` (optional) - Model name for the selected provider
-
-**Examples:**
-```
-/provider openai
-/provider anthropic claude-3-sonnet
-/provider
-```
-
-**Description:**
-Switches the active AI provider. Without arguments, shows current provider and available options. With provider only, switches to that provider's default model. With both arguments, switches provider and sets the specified model.
-
-**Note:** Provider must be configured in `~/.config/ai-cli/config.json` with appropriate API keys.
+**Output:** Fixed code with explanation of changes made.
 
 ---
 
 ## File Commands
 
-### `/file` (alias: `cat`)
+### `/file [path]`
+File operations (view, copy, move, delete, rename).
 
-Show file content with syntax highlighting.
-
-**Syntax:**
-```
-/file <file>
-```
+**Aliases:** None
 
 **Arguments:**
-- `file` (required) - Path to file to display
+- `path` - File or directory path
 
 **Examples:**
 ```
-/file package.json
-/file src/app.tsx
+/file src/utils.ts
+/file ./backup
 ```
 
-**Description:**
-Displays the contents of the specified file with syntax highlighting based on file extension. The file content is shown in a scrollable view with line numbers.
+**Interactive:** Opens file explorer with options to view, edit, copy, move, delete.
 
 ---
 
-### `/open` (alias: `view`)
-
-View file content (read-only).
-
-**Syntax:**
-```
-/open <file>
-```
-
-**Arguments:**
-- `file` (required) - Path to file to view
-
-**Examples:**
-```
-/open README.md
-/open src/types.ts
-```
-
-**Description:**
-Similar to `/file` but optimized for quick viewing. Opens the file in a dedicated viewer pane.
-
----
-
-### `/edit`
-
-Open file in full-screen editor.
-
-**Syntax:**
-```
-/edit <file>
-```
-
-**Arguments:**
-- `file` (required) - Path to file to edit
-
-**Examples:**
-```
-/edit src/commands.ts
-/edit config.json
-```
-
-**Description:**
-Opens the specified file in the built-in full-screen editor. The editor supports:
-- Vim-like keybindings (optional)
-- Syntax highlighting
-- Search functionality
-- Save and discard changes
-
-**Editor Controls:**
-- `Ctrl+S` - Save changes
-- `Ctrl+Q` - Quit without saving
-- `Ctrl+F` - Search
-- `Arrow keys` - Navigate
-
----
-
-### `/ls`
-
+### `/ls [path]`
 List files in directory.
 
-**Syntax:**
-```
-/ls [path]
-```
+**Aliases:** None
 
 **Arguments:**
-- `path` (optional) - Directory path to list. Defaults to current working directory.
+- `path` (optional) - Directory path. Defaults to current directory.
 
 **Examples:**
 ```
-/ls
-/ls src/
-/ls /home/user/projects
+ls /home/user
+ls src/
+ls
 ```
 
-**Description:**
-Lists files and directories in the specified path. Shows file sizes, modification dates, and permissions (where available). Directories are marked with a trailing `/`.
+**Output:** Colorized directory listing with file sizes and modification times.
 
 ---
 
-### `/browse` (aliases: `b`, `files`)
+### `/open [file]`
+Open file in editor.
 
-Open interactive file explorer to select files.
-
-**Syntax:**
-```
-/browse [path] [--ext <ext>] [--search <query>]
-```
+**Aliases:** None
 
 **Arguments:**
-- `path` (optional) - Starting directory. Defaults to current working directory.
-- `--ext <ext>` - Filter by file extension (e.g., `--ext ts`, `--ext js,tsx`)
-- `--search <query>` - Filter by filename containing query string
+- `file` - Path to file to open
+
+**Examples:**
+```
+open README.md
+open src/index.tsx
+```
+
+**Behavior:** Loads file into full-screen editor with syntax highlighting.
+
+---
+
+### `/edit [file]`
+Edit file with external editor.
+
+**Aliases:** None
+
+**Arguments:**
+- `file` (optional) - File to edit. If omitted, edits current buffer.
+
+**Examples:**
+```
+edit config.json
+edit
+```
+
+**Behavior:** Opens file in configured $EDITOR or nano.
+
+---
+
+### `/browse`
+Browse files interactively.
+
+**Aliases:** None
+
+**Arguments:** None
 
 **Examples:**
 ```
 /browse
-/browse src/
-/browse --ext ts,tsx
-/browse --search component
-/browse src/ --ext tsx --search Button
 ```
 
-**Description:**
-Opens an interactive file browser where you can:
-- Navigate directories with arrow keys
-- Filter files by extension or search query
-- Select files to use with other commands
-- Press Enter to choose a file
-- Press Escape to cancel
-
-**File Explorer Controls:**
-- `Arrow Up/Down` - Navigate file list
-- `Arrow Left/Right` - Navigate directories (when focused on path)
-- `Enter` - Select file
-- `Escape` - Close browser
-- `/` - Start typing to filter
-
----
-
-### `/cd` (alias: `chdir`)
-
-Change working directory.
-
-**Syntax:**
-```
-/cd [path]
-```
-
-**Arguments:**
-- `path` (optional) - Directory path. If omitted, changes to home directory.
-
-**Examples:**
-```
-/cd /home/user/projects
-/cd src/
-/cd ..
-/cd
-```
-
-**Description:**
-Changes the current working directory for subsequent commands. Affects relative paths in other commands. Without arguments, changes to the home directory.
-
----
-
-### `/pwd`
-
-Print current working directory.
-
-**Syntax:**
-```
-/pwd
-```
-
-**Arguments:**
-None
-
-**Examples:**
-```
-/pwd
-```
-
-**Description:**
-Displays the absolute path of the current working directory.
+**Behavior:** Opens interactive file browser with search, filtering, and preview.
 
 ---
 
 ## Git Commands
 
-### `/git` (alias: `g`)
+### `/git [subcommand] [args...]`
+Git operations with colored output.
 
-Execute git commands.
-
-**Syntax:**
-```
-/git <subcommand> [args...]
-```
+**Aliases:** None
 
 **Subcommands:**
 - `status` - Show working tree status
-- `diff` - Show changes (use `diff HEAD` for staged + unstaged)
-- `log` - Show commit history
-- `add` - Add files to staging
-- `commit` - Commit staged changes
-- `branch` - List or create branches
-- `checkout` - Switch branches
-- `pull` - Pull from remote
-- `push` - Push to remote
-- `clone` - Clone a repository
-- `init` - Initialize repository
+- `diff` [staged] - Show changes (staged if true)
+- `log` [limit] - Show commit history (default 10)
+- `add` [files...] - Stage files
+- `commit` [message] - Commit staged changes
+- `branch` - List branches
+- `checkout` [branch] - Switch branch
+- `merge` [branch] - Merge branch
+- `rebase` [branch] - Rebase onto branch
+- `stash` [list|save|apply|pop|drop] - Stash operations
+- `bisect` [start|good|bad|reset] - Binary search for bugs
+- `worktree` [add|list|remove] - Manage worktrees
+- `delete-branch` [branch] - Delete branch
+- `rename-branch` [old] [new] - Rename branch
+- `blame` [file] - Show line-by-line authorship
 
 **Examples:**
 ```
 /git status
-/git diff HEAD
-/git log --oneline -10
-/git add src/
-/git commit -m "feat: add new feature"
+/git diff
+/git log 20
+/git add .
+/git commit "feat: add new feature"
 /git branch
-/git checkout feature-branch
-/git pull origin main
-/git push
+/git checkout feature/new-ui
+/git merge main
+/git stash save "WIP"
+/git stash list
+/git bisect start
+/git bisect bad
+/git bisect good abc123
+/git blame src/index.tsx
 ```
 
-**Description:**
-Executes git commands from within ai-cli. Output is formatted and displayed in the chat. Common workflows:
-
-1. **Check status**: `/git status`
-2. **Review changes**: `/git diff HEAD`
-3. **Stage files**: `/git add <file>`
-4. **Commit**: `/git commit -m "message"`
-5. **Push**: `/git push`
-
-**Note:** Git commands run in the current working directory. Ensure you're in a git repository.
+**Output:** Colored git output with branch names, status colors, and diff highlighting.
 
 ---
 
 ## Shell Commands
 
-### `/sh` (aliases: `!`, `shell`)
-
+### `/sh [command]`
 Execute shell command.
 
-**Syntax:**
-```
-/sh <command>
-```
+**Aliases:** None
 
 **Arguments:**
-- `command` (required) - Shell command to execute
+- `command` - Shell command to execute
 
 **Examples:**
 ```
 /sh ls -la
-/sh npm install
-/sh ps aux | grep node
-/sh echo $PATH
+/sh pwd
+/sh echo "Hello World"
 ```
 
-**Description:**
-Executes an arbitrary shell command and displays the output. Useful for:
-- Running system commands
-- Checking processes
-- File operations
-- Package management
-- Any command-line tool
-
-**Note:** Commands run in the current working directory. Use absolute paths for clarity.
+**Behavior:** Executes via `sh -c` supporting pipes, redirects, and shell features.
 
 ---
 
-### `/run` (alias: `r`)
+### `/run [file]`
+Run executable file.
 
-Execute a code file.
-
-**Syntax:**
-```
-/run <file> [args...]
-```
+**Aliases:** None
 
 **Arguments:**
-- `file` (required) - Path to executable file
-- `args` (optional) - Arguments to pass to the program
+- `file` - Path to executable
 
 **Examples:**
 ```
-/run script.py
-/run app.js --port 3000
-/run main.go
-/run Cargo.toml  # Runs cargo if in Rust project
+run ./build/app
+run script.sh
+run /usr/local/bin/mytool
 ```
 
-**Description:**
-Executes a code file using the appropriate interpreter or runtime. ai-cli auto-detects the language based on file extension:
-
-| Extension | Interpreter |
-|-----------|-------------|
-| `.py` | `python` or `python3` |
-| `.js` | `node` |
-| `.ts` | `tsx` or `bun` |
-| `.go` | `go run` |
-| `.rs` | `cargo run` (if Cargo.toml exists) |
-| `.rb` | `ruby` |
-| `.php` | `php` |
-| `.sh` | `bash` |
-| `.lua` | `lua` |
-
-**Note:** The interpreter must be in your PATH.
+**Behavior:** Executes file directly with proper permissions.
 
 ---
 
-### `/exec` (alias: `x`)
+### `/exec [command]`
+Execute command (alias for /sh).
 
-Execute code snippet (experimental).
-
-**Syntax:**
-```
-/exec <language> <code>
-```
+**Aliases:** None
 
 **Arguments:**
-- `language` (required) - Programming language identifier
-- `code` (required) - Code to execute
+- `command` - Command to execute
 
 **Examples:**
 ```
-/exec python print("Hello, World!")
-/exec js console.log("Hello")
-/exec bash echo $HOME
+exec npm run build
+exec make test
 ```
-
-**Description:**
-Executes a code snippet directly without creating a file. Useful for quick tests and experiments.
-
-**Supported Languages:**
-- `python` / `py`
-- `javascript` / `js`
-- `typescript` / `ts`
-- `bash` / `sh`
-- `go`
-- `ruby` / `rb`
-- `php`
-- `lua`
-
-**Note:** This feature is experimental and may have security implications. Only execute trusted code.
 
 ---
 
 ## Session Commands
 
-### `/sessions` (aliases: `ls-sessions`, `session-list`)
-
+### `/sessions`
 List all saved sessions.
 
-**Syntax:**
-```
-/sessions
-```
+**Aliases:** None
 
-**Arguments:**
-None
+**Arguments:** None
 
 **Examples:**
 ```
 /sessions
 ```
 
-**Description:**
-Displays a list of all saved chat sessions with:
-- Session ID
-- Title (if saved with `/save`)
-- Creation date
-- Message count
-- Duration
-
-Sessions are auto-saved every 60 seconds and on exit to `~/.local/share/ai-cli/sessions/`.
+**Output:** List of sessions with ID, title, creation date, and message count.
 
 ---
 
-### `/save` (alias: `save-session`)
+### `/load [id]`
+Load a saved session.
 
-Save current chat session.
-
-**Syntax:**
-```
-/save [title]
-```
+**Aliases:** None
 
 **Arguments:**
-- `title` (optional) - Custom title for the session
+- `id` - Session ID to load
 
 **Examples:**
 ```
-/save
-/save "Debugging API issue"
-/save "React component design"
+load abc123def456
 ```
 
-**Description:**
-Saves the current chat session to disk. If no title is provided, uses a timestamp-based title. Saved sessions can be restored later with `/load`.
-
-**Storage Location:**
-`~/.local/share/ai-cli/sessions/`
+**Behavior:** Restores conversation history from saved session.
 
 ---
 
-### `/load` (alias: `restore`)
+### `/save [name]`
+Save current session.
 
-Load a saved session by ID.
-
-**Syntax:**
-```
-/load <session-id>
-```
+**Aliases:** None
 
 **Arguments:**
-- `session-id` (required) - Session ID from `/sessions` list
+- `name` (optional) - Session name. If omitted, uses first message as title.
 
 **Examples:**
 ```
-/load abc123def456
+save "Debugging session"
+save
 ```
 
-**Description:**
-Restores a previously saved session, loading all chat messages and context. The current session is saved automatically before loading a new one.
-
-**Note:** Session IDs are shown in the `/sessions` list.
+**Behavior:** Saves current conversation to `~/.config/ai-cli/sessions/`.
 
 ---
 
-### `/delete` (aliases: `rm-session`, `del-session`)
-
+### `/delete [id]`
 Delete a saved session.
 
-**Syntax:**
-```
-/delete <session-id>
-```
+**Aliases:** None
 
 **Arguments:**
-- `session-id` (required) - Session ID to delete
+- `id` - Session ID to delete
 
 **Examples:**
 ```
-/delete abc123def456
+delete abc123def456
 ```
 
-**Description:**
-Permanently deletes a saved session from disk. Cannot be undone. Use `/sessions` to list available session IDs.
+**Behavior:** Permanently deletes session file and removes from memory.
 
 ---
 
-## Editor & Environment Commands
+## Developer Tools
 
-### `/clear` (alias: `cls`)
+### `/json [action] [data]`
+JSON utilities.
 
-Clear chat history.
+**Aliases:** None
 
-**Syntax:**
-```
-/clear
-```
-
-**Arguments:**
-None
+**Actions:**
+- `format` [json] - Pretty print JSON
+- `minify` [json] - Compact JSON
+- `validate` [json] - Check if valid JSON
+- `convert` [json] [format] - Convert to yaml/toml/csv
+- `query` [json] [path] - Query with JSONPath
 
 **Examples:**
 ```
-/clear
+/json format '{"a":1,"b":2}'
+/json minify '{"a": 1, "b": 2}'
+/json validate '{"valid": true}'
+/json convert '[{"name":"Alice"}]' csv
+/json query '{"users":[{"name":"Alice"}]}' '$.users[0].name'
 ```
-
-**Description:**
-Clears all messages from the current chat session. The session remains active but all previous context is removed. Useful for starting fresh without creating a new session.
-
-**Note:** This does not delete saved sessions; it only clears the current chat view.
 
 ---
 
-### `/history`
+### `/base64 [action] [data]`
+Base64 encode/decode.
 
-Show command history.
+**Aliases:** None
 
-**Syntax:**
-```
-/history
-```
-
-**Arguments:**
-None
+**Actions:**
+- `encode` [text] - Encode to base64
+- `decode` [base64] - Decode from base64
+- `encode-file` [path] - Encode file contents
+- `decode-file` [path] [output] - Decode to file
+- `url-safe` [text] - URL-safe encoding
+- `is-base64` [text] - Check if valid base64
 
 **Examples:**
 ```
-/history
+/base64 encode "Hello World"
+/base64 decode "SGVsbG8gV29ybGQ="
+/base64 encode-file image.png
+/base64 decode-file encoded.b64 decoded.png
 ```
-
-**Description:**
-Displays a list of recently executed slash commands. Shows command, arguments, and timestamp. Use arrow keys (Up/Down) in the input field to navigate history.
 
 ---
 
-### `/alias`
+### `/hash [algorithm] [data]`
+Hash data.
 
+**Aliases:** None
+
+**Algorithms:** `md5`, `sha1`, `sha256`, `sha512`
+
+**Examples:**
+```
+/hash sha256 "hello world"
+/hash md5 file.txt
+/hash sha512 "secret"
+```
+
+**Output:** Hex-encoded hash digest.
+
+---
+
+### `/uuid [version]`
+Generate UUID.
+
+**Aliases:** None
+
+**Versions:** `v1` (time-based), `v4` (random), `v5` (namespace)
+
+**Examples:**
+```
+/uuid v4
+/uuid v1
+/uuid v5 "example.com"
+```
+
+**Output:** UUID string.
+
+---
+
+### `/regex [action] [pattern] [text]`
+Regex operations.
+
+**Aliases:** None
+
+**Actions:**
+- `match` - Find matches
+- `replace` [replacement] - Replace matches
+- `split` - Split by pattern
+- `test` - Test if pattern matches
+
+**Examples:**
+```
+/regex match "\d+" "abc123def456"
+/regex replace "\s+" "-" "hello world"
+/regex test "^[a-z]+$" "test123"
+```
+
+---
+
+### `/text [action] [text]`
+Text utilities.
+
+**Aliases:** None
+
+**Actions:**
+- `upper` - Convert to uppercase
+- `lower` - Convert to lowercase
+- `reverse` - Reverse string
+- `length` - Get string length
+- `trim` - Trim whitespace
+- `slug` - Convert to slug
+- `count-words` - Count words
+- `count-lines` - Count lines
+
+**Examples:**
+```
+/text upper "hello"
+/text lower "HELLO"
+/text reverse "abc"
+/text length "hello world"
+/text slug "Hello World!"
+```
+
+---
+
+## Network Tools
+
+### `/http [method] [url] [body]`
+Make HTTP request.
+
+**Aliases:** None
+
+**Methods:** `GET`, `POST`, `PUT`, `DELETE`, `PATCH`
+
+**Examples:**
+```
+/http GET https://api.example.com/users
+/http POST https://api.example.com/users '{"name":"Alice"}'
+/http GET https://httpbin.org/headers
+```
+
+**Output:** Response status, headers, and body.
+
+---
+
+### `/dns [hostname]`
+DNS lookup.
+
+**Aliases:** None
+
+**Examples:**
+```
+/dns example.com
+/dns google.com
+```
+
+**Output:** A, AAAA, CNAME, MX, TXT, NS records.
+
+---
+
+### `/ping [host]`
+Ping host.
+
+**Aliases:** None
+
+**Examples:**
+```
+/ping google.com
+/ping 8.8.8.8
+```
+
+**Output:** Latency statistics and packet loss.
+
+---
+
+### `/ports [host] [ports]`
+Port scan.
+
+**Aliases:** None
+
+**Examples:**
+```
+/ports localhost 80,443,3000
+/ports 192.168.1.1 1-1000
+```
+
+**Output:** Open ports and services.
+
+---
+
+### `/ssl [hostname] [port]`
+SSL/TLS certificate check.
+
+**Aliases:** None
+
+**Examples:**
+```
+/ssl example.com 443
+/ssl google.com
+```
+
+**Output:** Certificate details, issuer, validity, and chain.
+
+---
+
+## System Commands
+
+### `/sysinfo`
+Show system information.
+
+**Aliases:** None
+
+**Examples:**
+```
+/sysinfo
+```
+
+**Output:** OS, CPU, memory, disk, uptime, load average.
+
+---
+
+### `/top`
+Show running processes.
+
+**Aliases:** None
+
+**Examples:**
+```
+/top
+```
+
+**Behavior:** Interactive process monitor (top-like) with CPU, memory, PID, command.
+
+---
+
+### `/kill [pid]`
+Kill process by PID.
+
+**Aliases:** None
+
+**Examples:**
+```
+/kill 1234
+/kill -9 5678
+```
+
+**Arguments:** PID and optional signal (default SIGTERM).
+
+---
+
+### `/df`
+Show disk usage.
+
+**Aliases:** None
+
+**Examples:**
+```
+/df
+```
+
+**Output:** Filesystem, size, used, available, usage%, mount point.
+
+---
+
+### `/free`
+Show memory usage.
+
+**Aliases:** None
+
+**Examples:**
+```
+/free
+```
+
+**Output:** Total, used, free, shared, cache, available memory.
+
+---
+
+## File Tools
+
+### `/tree [path]`
+Show directory tree.
+
+**Aliases:** None
+
+**Examples:**
+```
+/tree src/
+/tree . --max-depth 3
+/tree --ignore node_modules
+```
+
+**Options:**
+- `--max-depth N` - Maximum depth
+- `--no-files` - Show directories only
+- `--ignore PATTERN` - Ignore pattern (glob)
+- `--hidden` - Show hidden files
+- `--icons` - Show file icons
+
+**Output:** ASCII tree with branch characters.
+
+---
+
+### `/diff [file1] [file2]`
+Show diff between files.
+
+**Aliases:** None
+
+**Examples:**
+```
+/diff old.js new.js
+/diff file1.txt file2.txt
+```
+
+**Output:** Unified diff with +/- lines and hunk headers.
+
+---
+
+### `/find [path] [pattern]`
+Find files.
+
+**Aliases:** None
+
+**Examples:**
+```
+find . "*.ts"
+find src/ "**/*.test.ts"
+find . -name "*.log"
+```
+
+**Arguments:** Path, pattern (glob or find expression).
+
+---
+
+### `/grep [pattern] [path]`
+Search file contents.
+
+**Aliases:** None
+
+**Examples:**
+```
+/grep "TODO" src/
+/grep -r "FIXME" .
+/grep "console.log" src/**/*.ts
+```
+
+**Options:** `-r` recursive, `-i` ignore case, `-n` line numbers, `-l` list files only.
+
+**Output:** Matching lines with file:line:content format.
+
+---
+
+### `/du [path]`
+Show directory size.
+
+**Aliases:** None
+
+**Examples:**
+```
+/du src/
+/du . --max-depth 2
+/du -h
+```
+
+**Options:** `-h` human-readable, `--max-depth N` depth limit.
+
+**Output:** Size per directory.
+
+---
+
+### `/view [file]`
+View file (read-only).
+
+**Aliases:** None
+
+**Examples:**
+```
+/view README.md
+/view package.json
+```
+
+**Behavior:** Opens file in read-only viewer with syntax highlighting and paging.
+
+---
+
+## Plugin Commands
+
+### `/plugins`
+List installed plugins.
+
+**Aliases:** None
+
+**Examples:**
+```
+/plugins
+```
+
+**Output:** Plugin name, version, description, enabled status.
+
+---
+
+### `/plugin install [url]`
+Install plugin from URL or git repo.
+
+**Aliases:** None
+
+**Examples:**
+```
+/plugin install https://github.com/user/plugin.git
+/plugin install https://example.com/plugin.tar.gz
+```
+
+**Behavior:** Downloads and installs plugin to `~/.config/ai-cli/plugins/`.
+
+---
+
+### `/plugin uninstall [name]`
+Uninstall plugin.
+
+**Aliases:** None
+
+**Examples:**
+```
+/plugin uninstall my-plugin
+```
+
+**Behavior:** Removes plugin from plugins directory.
+
+---
+
+### `/plugin enable [name]`
+Enable plugin.
+
+**Aliases:** None
+
+**Examples:**
+```
+/plugin enable my-plugin
+```
+
+---
+
+### `/plugin disable [name]`
+Disable plugin.
+
+**Aliases:** None
+
+**Examples:**
+```
+/plugin disable my-plugin
+```
+
+---
+
+## Theme Commands
+
+### `/themes`
+List available themes.
+
+**Aliases:** None
+
+**Examples:**
+```
+/themes
+```
+
+**Output:** Theme names with preview colors.
+
+---
+
+### `/theme [name]`
+Set theme.
+
+**Aliases:** None
+
+**Examples:**
+```
+/theme dark
+/theme ocean
+/theme custom-mytheme
+```
+
+**Behavior:** Changes theme immediately. Persists to config.
+
+---
+
+## Termux Commands
+
+### `/termux status`
+Check Termux environment.
+
+**Aliases:** None
+
+**Examples:**
+```
+/termux status
+```
+
+**Output:** Termux version, API level, packages, shell profile status.
+
+---
+
+### `/termux setup`
+Setup Termux environment.
+
+**Aliases:** None
+
+**Examples:**
+```
+/termux setup
+```
+
+**Behavior:** Installs recommended packages, configures shell profile, sets up aliases.
+
+---
+
+## Settings
+
+### `/provider [name]`
+Set AI provider.
+
+**Aliases:** None
+
+**Examples:**
+```
+/provider nvidia
+/provider openai
+/provider anthropic
+/provider ollama
+```
+
+**Providers:** `nvidia`, `openai`, `anthropic`, `ollama`
+
+---
+
+### `/alias [name] [command]`
 Create command alias.
 
-**Syntax:**
-```
-/alias name=command
-```
-
-**Arguments:**
-- `name=command` (required) - Alias definition
+**Aliases:** None
 
 **Examples:**
 ```
-/alias rv=/review
-/alias py=/run *.py
-/alias gs=/git status
+/alias r /review
+/alias mycmd /echo "custom command"
 ```
 
-**Description:**
-Creates a custom alias for frequently used commands. Aliases are saved in the config file and persist across sessions.
+**Behavior:** Creates custom shortcut for frequently used commands.
 
-**Note:** Aliases are simple text substitutions. Complex aliases with arguments may not work as expected.
+---
+
+### `/export [var] [value]`
+Set environment variable.
+
+**Aliases:** None
+
+**Examples:**
+```
+/export PATH "/usr/local/bin:$PATH"
+/export MY_VAR "value"
+```
+
+**Behavior:** Sets env var for current session and persists to config.
 
 ---
 
 ### `/env`
+List environment variables.
 
-Show environment variables.
-
-**Syntax:**
-```
-/env
-```
-
-**Arguments:**
-None
+**Aliases:** None
 
 **Examples:**
 ```
 /env
 ```
 
-**Description:**
-Displays all environment variables that ai-cli can see. Useful for debugging API key configuration and PATH issues.
-
-**Note:** Sensitive values like API keys are masked with `***` for security.
+**Output:** All environment variables with values.
 
 ---
 
-### `/export` (alias: `set`)
+### `/clear`
+Clear screen.
 
-Set environment variable.
-
-**Syntax:**
-```
-/export KEY=value
-```
-
-**Arguments:**
-- `KEY=value` (required) - Environment variable to set
+**Aliases:** None
 
 **Examples:**
 ```
-/export OPENAI_API_KEY=sk-...
-/export DEBUG=true
+/clear
 ```
 
-**Description:**
-Sets an environment variable for the current session. Variables set this way are not persisted after exit. For permanent configuration, use the config file or shell profile.
+---
 
-**Note:** API keys set via `/export` override config file settings for the current session only.
+### `/help`
+Show help.
+
+**Aliases:** `/?, /h`
+
+**Examples:**
+```
+/help
+/?
+/h
+```
+
+**Output:** This command reference or command-specific help.
 
 ---
 
 ## Command Aliases Summary
 
-| Command | Aliases |
-|---------|---------|
-| `/help` | `h`, `?` |
-| `/file` | `cat` |
-| `/review` | `rv` |
-| `/explain` | `e` |
-| `/fix` | `f` |
-| `/edit` | `e` |
-| `/provider` | `model` |
-| `/git` | `g` |
-| `/sh` | `!`, `shell` |
-| `/run` | `r` |
-| `/exec` | `x` |
-| `/open` | `view` |
-| `/cd` | `chdir` |
-| `/export` | `set` |
-| `/browse` | `b`, `files` |
-| `/sessions` | `ls-sessions`, `session-list` |
-| `/save` | `save-session` |
-| `/load` | `restore` |
-| `/delete` | `rm-session`, `del-session` |
-| `/clear` | `cls` |
+| Alias | Command |
+|-------|---------|
+| `r` | `/review` |
+| `e` | `/explain` |
+| `f` | `/fix` |
+| `?`, `h` | `/help` |
 
 ---
 
-## Tips & Best Practices
+## Tips
 
-1. **Use Tab autocomplete**: Start typing `/` and press Tab to see matching commands.
-2. **Review before fixing**: Use `/review` first to understand issues before `/fix`.
-3. **Save important sessions**: Use `/save` with a descriptive title for important work.
-4. **Configure providers**: Set up your AI provider in config before heavy usage.
-5. **Use `/browse` for files**: It's faster than typing full paths manually.
-6. **Git workflow**: `/git status` → `/git diff` → `/git add` → `/git commit` → `/git push`.
-7. **Shell commands**: Use `/sh` for quick system checks; use `/run` for executing code files.
-8. **Session management**: Sessions auto-save every 60s, but manually save important ones.
-9. **Keyboard shortcuts**: `Ctrl+B` toggles sidebar for more chat space.
-10. **Provider switching**: Use `/provider` to switch between AI models for different tasks.
-
----
-
-## Error Handling
-
-Common errors and solutions:
-
-| Error | Cause | Solution |
-|-------|-------|----------|
-| `Provider not configured` | No API key in config | Add provider to `~/.config/ai-cli/config.json` |
-| `File not found` | Invalid path | Check path with `/ls` or `/pwd` |
-| `Permission denied` | No read/write access | Use `chmod` or run with appropriate permissions |
-| `Command not found` | Invalid command | Use `/help` to see available commands |
-| `Not a git repository` | Not in a git repo | `cd` to a git repository or run `/git init` |
-| `Interpreter not found` | Language runtime not in PATH | Install the required runtime (python, node, etc.) |
-| `API error` | Invalid API key or network issue | Check API key, internet connection, provider status |
+1. **Tab Completion:** Press Tab to autocomplete commands and file paths.
+2. **Command History:** Use ↑/↓ to navigate command history.
+3. **Search History:** Press Ctrl+R to search past commands.
+4. **Multi-line Commands:** Use Shift+Enter for newlines in command input.
+5. **Cancel:** Press Esc to cancel current operation.
+6. **Help:** Type `/help <command>` for command-specific help.
