@@ -9,7 +9,9 @@ pub struct Config {
     pub default_provider: String,
     pub default_model: String,
     pub providers: HashMap<String, ProviderConfig>,
+    #[serde(default)]
     pub templates: TemplateConfig,
+    #[serde(default)]
     pub settings: Settings,
 }
 
@@ -25,15 +27,44 @@ pub struct ProviderConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TemplateConfig {
     pub dir: Option<PathBuf>,
+    #[serde(default = "default_true")]
     pub builtin: bool,
+}
+
+impl Default for TemplateConfig {
+    fn default() -> Self {
+        TemplateConfig {
+            dir: None,
+            builtin: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
+    #[serde(default)]
     pub auto_apply: bool,
+    #[serde(default)]
     pub verbose: bool,
+    #[serde(default = "default_true")]
     pub color: bool,
+    #[serde(default = "default_true")]
     pub git_context: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Settings {
+            auto_apply: false,
+            verbose: false,
+            color: true,
+            git_context: true,
+        }
+    }
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for Config {
@@ -78,7 +109,7 @@ impl Default for Config {
             ProviderConfig {
                 api_key: None,
                 base_url: Some("https://integrate.api.nvidia.com/v1".to_string()),
-                model: Some("nvidia/llama-3.1-nemotron-70b-instruct".to_string()),
+                model: Some("nvidia/llama-3.3-nemotron-super-49b-v1".to_string()),
                 max_tokens: Some(4096),
                 temperature: Some(0.7),
             },

@@ -66,12 +66,14 @@ impl Provider for NvidiaProvider {
 
     fn models(&self) -> Vec<&str> {
         vec![
-            "nvidia/llama-3.1-nemotron-70b-instruct",
-            "nvidia/llama-3.1-8b-instruct",
-            "nvidia/mistral-nemo-12b-instruct",
-            "meta/llama-3.1-405b-instruct",
-            "meta/llama-3.1-70b-instruct",
+            "nvidia/llama-3.3-nemotron-super-49b-v1",
+            "nvidia/llama3.1-nemotron-nano-4b-v1.1",
             "meta/llama-3.1-8b-instruct",
+            "meta/llama-3.1-70b-instruct",
+            "deepseek/deepseek-r1",
+            "deepseek/deepseek-v3.2-exp",
+            "qwen/qwen3-32b",
+            "qwen/qwen2.5-coder-32b-instruct",
         ]
     }
 
