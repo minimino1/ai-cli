@@ -37,7 +37,7 @@ AI-powered CLI for code assistance - fix, explain, review, and more.
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Clone and build
-git clone https://github.com/yourusername/ai-cli.git
+git clone https://github.com/minimino1/ai-cli.git
 cd ai-cli
 cargo build --release
 
@@ -45,13 +45,6 @@ cargo build --release
 cargo install --path .
 ```
 
-### From Debian Package
-
-```bash
-# Download and install
-wget https://github.com/yourusername/ai-cli/releases/latest/download/ai-cli.deb
-sudo dpkg -i ai-cli.deb
-```
 
 ### For Termux
 
@@ -60,7 +53,7 @@ sudo dpkg -i ai-cli.deb
 pkg install rust binutils
 
 # Clone and build
-git clone https://github.com/yourusername/ai-cli.git
+git clone https://github.com/minimino1/ai-cli.git
 cd ai-cli
 cargo build --release
 
