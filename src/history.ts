@@ -52,7 +52,7 @@ export class SessionManager {
     const session: Session = {
       id,
       title,
-      messages: JSON.parse(JSON.stringify(messages)), // Deep clone
+      messages,
       createdAt: customId && this.sessions.has(id) ? this.sessions.get(id)!.createdAt : now,
       updatedAt: now,
     }
@@ -60,11 +60,15 @@ export class SessionManager {
     this.sessions.set(id, session)
 
     const filePath = join(SESSIONS_DIR, `${id}.json`)
-    await writeFile(filePath, JSON.stringify(session, (key, value) =>
-      key === 'timestamp' || key === 'createdAt' || key === 'updatedAt'
-        ? value.toISOString()
-        : value
-    , 2))
+    const serialized = JSON.stringify(session, (key, value) => {
+      if (key === 'timestamp' || key === 'createdAt' || key === 'updatedAt') {
+        if (value instanceof Date) return value.toISOString()
+        if (typeof value === 'string') return value // already serialized
+        return String(value)
+      }
+      return value
+    }, 2)
+    await writeFile(filePath, serialized)
 
     return id
   }

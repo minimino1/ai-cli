@@ -64,7 +64,11 @@ export const Editor: React.FC<EditorProps> = ({
   const handleKeyPress = useCallback((inputChar: string, key: any) => {
     // Ctrl+S - Save
     if (key.ctrl && inputChar === 's') {
-      const content = lines.join('\n')
+      const newLines = [...lines]
+      if (currentLine < newLines.length) {
+        newLines[currentLine] = inputValue
+      }
+      const content = newLines.join('\n')
       onSave(content)
       return
     }
