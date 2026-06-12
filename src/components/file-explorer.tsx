@@ -108,7 +108,10 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
 
   const filteredEntries = entries.filter(e => {
     const matchesSearch = !search || e.name.toLowerCase().includes(search.toLowerCase())
-    const matchesExt = !filterExt || (!e.isDir && extname(e.name) === filterExt)
+    const normalizedExt = filterExt
+      ? (filterExt.startsWith('.') ? filterExt.toLowerCase() : `.${filterExt.toLowerCase()}`)
+      : ''
+    const matchesExt = !normalizedExt || e.isDir || extname(e.name).toLowerCase() === normalizedExt
     return matchesSearch && matchesExt
   })
 
@@ -119,8 +122,16 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
     }
 
     if (key.enter) {
-      if (filteredEntries.length > 0 && !filteredEntries[selectedIndex]?.isDir) {
-        onSelect(filteredEntries[selectedIndex].path)
+      if (filteredEntries.length > 0) {
+        const entry = filteredEntries[selectedIndex]
+        if (entry?.isDir) {
+          setHistory(prev => [...prev, currentPath])
+          setCurrentPath(entry.path)
+          setSearch('')
+          setPreview('')
+        } else if (entry) {
+          onSelect(entry.path)
+        }
       }
       return
     }

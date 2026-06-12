@@ -1,8 +1,6 @@
 // ─── Shell Provider ────────────────────────────────────────────────
 // Execute shell commands with timeout and output capture
 
-import { spawn } from 'bun'
-
 export interface ShellResult {
   success: boolean
   exitCode: number
@@ -15,30 +13,41 @@ export interface ShellResult {
 export async function runShell(
   command: string,
   args: string[] = [],
-  timeoutMs: number = 30000
+  timeoutMs: number = 30000,
+  useShell: boolean = false
 ): Promise<ShellResult> {
-  const subprocess = Bun.spawn({
-    program: command,
-    args,
+  const spawnOptions: any = {
     cwd: Bun.cwd(),
     stdin: 'ignore',
     stdout: 'pipe',
     stderr: 'pipe',
+  }
+
+  // Use shell mode for commands with pipes, redirects, etc.
+  if (useShell) {
+    spawnOptions.shell = true
+  }
+
+  const subprocess = Bun.spawn({
+    program: useShell ? (process.platform === 'win32' ? 'cmd.exe' : 'sh') : command,
+    args: useShell ? [useShell ? '/c' : '-c', `${command} ${args.join(' ')}`.trim()] : args,
+    ...spawnOptions,
   })
 
   let stdout = ''
   let stderr = ''
   let timedOut = false
 
-  // Read stdout
-  if (subprocess.stdout) {
-    const reader = subprocess.stdout.getReader()
+  // Read stdout and stderr concurrently to prevent deadlock
+  const readStream = async (stream: ReadableStream<Uint8Array>): Promise<string> => {
+    let data = ''
+    const reader = stream.getReader()
     try {
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
         if (value) {
-          stdout += new TextDecoder().decode(value)
+          data += new TextDecoder().decode(value)
         }
       }
     } catch {
@@ -46,48 +55,44 @@ export async function runShell(
     } finally {
       reader.releaseLock()
     }
+    return data
   }
 
-  // Read stderr
-  if (subprocess.stderr) {
-    const reader = subprocess.stderr.getReader()
-    try {
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        if (value) {
-          stderr += new TextDecoder().decode(value)
-        }
-      }
-    } catch {
-      // ignore read errors
-    } finally {
-      reader.releaseLock()
-    }
-  }
+  const stdoutPromise = subprocess.stdout ? readStream(subprocess.stdout) : Promise.resolve('')
+  const stderrPromise = subprocess.stderr ? readStream(subprocess.stderr) : Promise.resolve('')
 
   // Wait for exit with timeout
   let exitCode: number
   try {
-    exitCode = await Promise.race([
-      subprocess.exited,
-      new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          timedOut = true
-          subprocess.kill('SIGKILL')
-          reject(new Error('timeout'))
-        }, timeoutMs)
-      })
+    const [, , exit] = await Promise.race([
+      stdoutPromise.then(s => { stdout = s }),
+      stderrPromise.then(s => { stderr = s }),
+      Promise.race([
+        subprocess.exited,
+        new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            timedOut = true
+            subprocess.kill('SIGKILL')
+            reject(new Error('timeout'))
+          }, timeoutMs)
+        })
+      ])
     ])
+    exitCode = exit as number
   } catch (err: any) {
+    // Ensure streams are drained
+    await Promise.all([stdoutPromise, stderrPromise])
     if (err.message === 'timeout') {
-      // Wait a bit for the process to actually die
       await new Promise(resolve => setTimeout(resolve, 100))
       exitCode = -1
     } else {
       throw err
     }
   }
+
+  // Ensure we have the final values
+  if (!stdout) stdout = await stdoutPromise
+  if (!stderr) stderr = await stderrPromise
 
   return {
     success: exitCode === 0,
@@ -99,47 +104,15 @@ export async function runShell(
 }
 
 // ─── Execute Command String ────────────────────────────────────────
-// Parses a command string and executes it
+// Uses shell mode to support pipes, redirects, &&, globbing, etc.
 export async function executeCommand(commandStr: string): Promise<string> {
-  // Trim and split command properly (respects quotes)
   const trimmed = commandStr.trim()
   if (!trimmed) {
     return 'Error: No command provided'
   }
 
-  // Simple parsing: split by spaces but respect quoted strings
-  const args: string[] = []
-  let current = ''
-  let inQuotes = false
-  let quoteChar = ''
-
-  for (let i = 0; i < trimmed.length; i++) {
-    const char = trimmed[i]
-
-    if ((char === '"' || char === "'") && !inQuotes) {
-      inQuotes = true
-      quoteChar = char
-    } else if (char === quoteChar && inQuotes) {
-      inQuotes = false
-      quoteChar = ''
-    } else if (char === ' ' && !inQuotes) {
-      if (current) {
-        args.push(current)
-        current = ''
-      }
-    } else {
-      current += char
-    }
-  }
-
-  if (current) {
-    args.push(current)
-  }
-
-  const command = args[0]
-  const commandArgs = args.slice(1)
-
-  const result = await runShell(command, commandArgs)
+  // Use shell mode to support full shell features
+  const result = await runShell(trimmed, [], 30000, true)
 
   let output = ''
 
@@ -160,7 +133,6 @@ export async function executeCommand(commandStr: string): Promise<string> {
     output += '(No output)'
   }
 
-  const statusColor = result.success ? 'green' : 'red'
   output += `\nExit code: ${result.exitCode}`
 
   return output

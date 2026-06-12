@@ -7,6 +7,10 @@ import { SessionManager } from './history'
 // Command history (in-memory for session)
 let commandHistory: string[] = []
 const MAX_HISTORY = 1000
+
+// ─── Aliases Registry ────────────────────────────────────────────
+const userAliases = new Map<string, string>()
+
 import * as gitProvider from './providers/git'
 import { executeCommand } from './providers/shell'
 import { executeFile, executeCode } from './providers/execute'
@@ -97,7 +101,7 @@ export const commands: Command[] = [
   {
     name: 'review',
     description: 'Review code for issues, bugs, and best practices',
-    aliases: ['r'],
+    aliases: ['rv'],
     args: ['[file]'],
     run: async (args, context) => {
       const filePath = args.trim() || '.'
@@ -243,6 +247,19 @@ export const commands: Command[] = [
     },
   },
 
+  // /edit - Edit file in editor mode
+  {
+    name: 'edit',
+    description: 'Open file in full-screen editor',
+    aliases: ['e'],
+    args: ['<file>'],
+    run: async (args) => {
+      // This is handled specially in app.tsx
+      // The command is registered so parseCommand recognizes /edit
+      return []
+    },
+  },
+
    // /provider - Switch provider
    {
      name: 'provider',
@@ -269,17 +286,18 @@ export const commands: Command[] = [
          p.id === providerName || p.name.toLowerCase() === providerName.toLowerCase()
        )
 
-       if (!provider) {
-         return [{
-           type: 'text',
-           text: `Unknown provider: ${providerName}`,
-         }]
-       }
+        if (!provider) {
+          return [{
+            type: 'text',
+            text: `Unknown provider: ${providerName}`,
+          }]
+        }
 
-       return [{
-         type: 'text',
-         text: `Switched to ${provider.name} (${provider.model})`,
-       }]
+        context.config.activeProvider = provider.id
+        return [{
+          type: 'text',
+          text: `Switched to ${provider.name} (${provider.model})`,
+        }]
      },
    },
 
@@ -434,11 +452,15 @@ export const commands: Command[] = [
       run: async (args, context) => {
         const targetPath = args.trim() || process.env.HOME || process.cwd()
         try {
-          const resolvedPath = join(context.cwd, targetPath)
+          const { isAbsolute } = await import('node:path')
+          const resolvedPath = isAbsolute(targetPath)
+            ? targetPath
+            : join(context.cwd, targetPath)
           const stats = await stat(resolvedPath)
           if (!stats.isDirectory()) {
             return [{ type: 'text', text: `Error: ${resolvedPath} is not a directory` }]
           }
+          process.chdir(resolvedPath)
           return [{
             type: 'text',
             text: `Changed directory to: ${resolvedPath}`,
@@ -508,6 +530,7 @@ export const commands: Command[] = [
           return [{ type: 'text', text: 'Usage: /alias name=command' }]
         }
         const [, aliasName, command] = match
+        userAliases.set(aliasName, command)
         return [{
           type: 'text',
           text: `Alias created: /${aliasName} -> ${command}`,
@@ -657,7 +680,7 @@ export const commands: Command[] = [
           return [{ type: 'text', text: 'Session manager not available' }]
         }
 
-        const id = await sessionManager.saveSession(messages, undefined)
+        const id = await sessionManager.saveSession(messages, customTitle)
         const session = await sessionManager.loadSession(id)
 
         return [{
@@ -701,6 +724,12 @@ export function parseCommand(input: string): { command: Command; args: string } 
   const parts = input.slice(1).split(/\s+/)
   const commandName = parts[0]
   const args = parts.slice(1).join(' ')
+
+  // Check user aliases first
+  if (userAliases.has(commandName)) {
+    const aliasedCommand = `/${userAliases.get(commandName)} ${args}`.trim()
+    return parseCommand(aliasedCommand)
+  }
 
   const command = commands.find(cmd =>
     cmd.name === commandName || cmd.aliases?.includes(commandName)

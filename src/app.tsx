@@ -8,6 +8,7 @@ import { sendToAI } from './providers/ai'
 import type { Message, MessagePart, Config, FileExplorerPart } from './types'
 import { SessionManager } from './history'
 import { FileExplorer } from './components/file-explorer'
+import { Editor } from './components/editor'
 
 interface AppProps {
   config: Config
@@ -38,14 +39,17 @@ export const App: React.FC<AppProps> = ({ config }) => {
   const theme = opencodeTheme
 
   // Auto-save sessions periodically
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
+
   useEffect(() => {
-    sessionManager.startAutoSave(messages, 60000) // Auto-save every 60 seconds
+    sessionManager.startAutoSave(() => messagesRef.current, 60000)
 
     return () => {
       sessionManager.stopAutoSave()
-      sessionManager.saveOnExit(messages).catch(console.error)
+      sessionManager.saveOnExit(messagesRef.current).catch(console.error)
     }
-  }, [messages, sessionManager])
+  }, [sessionManager])
 
   // Handle keyboard shortcuts
   useInput((inputChar, key) => {
@@ -76,12 +80,10 @@ export const App: React.FC<AppProps> = ({ config }) => {
     setEditingContent('')
   }, [])
 
-  const saveEditor = useCallback((content: string) => {
-    // Write file
+  const saveEditor = useCallback(async (content: string) => {
     try {
-      Bun.file(editingFile).write(content)
+      await Bun.file(editingFile).write(content)
       closeEditor()
-      // Add success message
       const systemMessage: Message = {
         id: Date.now().toString(),
         role: 'system',

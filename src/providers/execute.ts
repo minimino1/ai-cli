@@ -2,6 +2,8 @@
 // Execute code files based on their language/extension
 
 import { extname } from 'node:path'
+import { writeFile, unlink } from 'node:fs/promises'
+import { join } from 'node:path'
 
 export interface ExecuteResult {
   success: boolean
@@ -14,16 +16,13 @@ export interface ExecuteResult {
 }
 
 // ─── Language to Command Mapping ────────────────────────────────────
-const languageCommands: Record<string, { command: string; args?: string[] }> = {
-  python: { command: 'python', args: [] },
+const languageCommands: Record<string, { command: string; args: string[] }> = {
+  python: { command: 'python3', args: [] },
   javascript: { command: 'node', args: [] },
-  typescript: { command: 'tsx', args: [] },  // or ts-node
+  typescript: { command: 'tsx', args: [] },
   go: { command: 'go', args: ['run'] },
-  rust: { command: 'cargo', args: ['run'] },
   ruby: { command: 'ruby', args: [] },
   java: { command: 'java', args: [] },
-  c: { command: 'gcc', args: ['-o', '/tmp/a.out', '&&', '/tmp/a.out'] }, // Special handling
-  cpp: { command: 'g++', args: ['-o', '/tmp/a.out', '&&', '/tmp/a.out'] },
   bash: { command: 'bash', args: [] },
   sh: { command: 'sh', args: [] },
   php: { command: 'php', args: [] },
@@ -59,79 +58,86 @@ export function detectLanguage(filename: string): string {
 async function runCommand(
   command: string,
   args: string[],
-  timeoutMs: number = 30000
+  timeoutMs: number = 30000,
+  stdin?: string
 ): Promise<ExecuteResult> {
+  const spawnOptions: any = {
+    cwd: Bun.cwd(),
+    stdin: stdin ? 'pipe' : 'ignore',
+    stdout: 'pipe',
+    stderr: 'pipe',
+  }
+
   const subprocess = Bun.spawn({
     program: command,
     args,
-    cwd: Bun.cwd(),
-    stdin: 'ignore',
-    stdout: 'pipe',
-    stderr: 'pipe',
+    ...spawnOptions,
   })
+
+  // Write stdin if provided
+  if (stdin && subprocess.stdin) {
+    const writer = subprocess.stdin.getWriter()
+    await writer.write(new TextEncoder().encode(stdin))
+    await writer.close()
+  }
 
   let stdout = ''
   let stderr = ''
   let timedOut = false
 
-  // Read stdout
-  if (subprocess.stdout) {
-    const reader = subprocess.stdout.getReader()
+  // Read stdout and stderr concurrently
+  const readStream = async (stream: ReadableStream<Uint8Array>): Promise<string> => {
+    let data = ''
+    const reader = stream.getReader()
     try {
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
         if (value) {
-          stdout += new TextDecoder().decode(value)
+          data += new TextDecoder().decode(value)
         }
       }
     } catch {
-      // ignore read errors
+      // ignore
     } finally {
       reader.releaseLock()
     }
+    return data
   }
 
-  // Read stderr
-  if (subprocess.stderr) {
-    const reader = subprocess.stderr.getReader()
-    try {
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        if (value) {
-          stderr += new TextDecoder().decode(value)
-        }
-      }
-    } catch {
-      // ignore read errors
-    } finally {
-      reader.releaseLock()
-    }
-  }
+  const stdoutPromise = subprocess.stdout ? readStream(subprocess.stdout) : Promise.resolve('')
+  const stderrPromise = subprocess.stderr ? readStream(subprocess.stderr) : Promise.resolve('')
 
   // Wait for exit with timeout
   let exitCode: number
   try {
-    exitCode = await Promise.race([
-      subprocess.exited,
-      new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          timedOut = true
-          subprocess.kill('SIGKILL')
-          reject(new Error('timeout'))
-        }, timeoutMs)
-      })
+    const [, , exit] = await Promise.race([
+      stdoutPromise.then(s => { stdout = s }),
+      stderrPromise.then(s => { stderr = s }),
+      Promise.race([
+        subprocess.exited,
+        new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            timedOut = true
+            subprocess.kill('SIGKILL')
+            reject(new Error('timeout'))
+          }, timeoutMs)
+        })
+      ])
     ])
+    exitCode = exit as number
   } catch (err: any) {
+    await Promise.all([stdoutPromise, stderrPromise])
     if (err.message === 'timeout') {
-      // Wait a bit for the process to actually die
       await new Promise(resolve => setTimeout(resolve, 100))
       exitCode = -1
     } else {
       throw err
     }
   }
+
+  if (!stdout) stdout = await stdoutPromise
+  if (!stderr) stderr = await stderrPromise
 
   return {
     success: exitCode === 0,
@@ -147,57 +153,97 @@ async function runCommand(
 // ─── Execute File ──────────────────────────────────────────────────
 export async function executeFile(filePath: string): Promise<string> {
   const language = detectLanguage(filePath)
-  const langConfig = languageCommands[language]
 
+  // Handle C (compile then run)
+  if (language === 'c') {
+    const compileResult = await runCommand('gcc', ['-o', '/tmp/ai-cli-out', filePath])
+    if (!compileResult.success) {
+      return `Compilation failed:\n${compileResult.stderr}`
+    }
+    const runResult = await runCommand('/tmp/ai-cli-out', [])
+    await unlink('/tmp/ai-cli-out').catch(() => {})
+    return formatResult(runResult, language, filePath)
+  }
+
+  // Handle C++ (compile then run)
+  if (language === 'cpp') {
+    const compileResult = await runCommand('g++', ['-o', '/tmp/ai-cli-out', filePath])
+    if (!compileResult.success) {
+      return `Compilation failed:\n${compileResult.stderr}`
+    }
+    const runResult = await runCommand('/tmp/ai-cli-out', [])
+    await unlink('/tmp/ai-cli-out').catch(() => {})
+    return formatResult(runResult, language, filePath)
+  }
+
+  // Handle Rust (compile then run with rustc)
+  if (language === 'rust') {
+    const compileResult = await runCommand('rustc', ['-o', '/tmp/ai-cli-out', filePath])
+    if (!compileResult.success) {
+      return `Compilation failed:\n${compileResult.stderr}`
+    }
+    const runResult = await runCommand('/tmp/ai-cli-out', [])
+    await unlink('/tmp/ai-cli-out').catch(() => {})
+    return formatResult(runResult, language, filePath)
+  }
+
+  // Handle Java (compile then run)
+  if (language === 'java') {
+    const className = filePath.replace(/\.java$/, '').split('/').pop() || 'Main'
+    const compileResult = await runCommand('javac', [filePath])
+    if (!compileResult.success) {
+      return `Compilation failed:\n${compileResult.stderr}`
+    }
+    const dir = filePath.substring(0, filePath.lastIndexOf('/'))
+    const runResult = await runCommand('java', ['-cp', dir, className])
+    return formatResult(runResult, language, filePath)
+  }
+
+  // Interpreted languages
+  const langConfig = languageCommands[language]
   if (!langConfig) {
     return `Error: Unsupported language "${language}" for file ${filePath}`
   }
 
-  // Build command
-  let command = langConfig.command
-  let args = [...(langConfig.args || [])]
-
-  // Special handling for compiled languages
-  if (language === 'c' || language === 'cpp') {
-    // For C/C++, we need to compile and run
-    const compileResult = await runCommand(langConfig.command, [
-      ...args.slice(0, 2), // -o /tmp/a.out
-      filePath
-    ])
-
-    if (!compileResult.success) {
-      return `Compilation failed:\n${compileResult.stderr}`
-    }
-
-    // Run the compiled binary
-    const runResult = await runCommand('/tmp/a.out', [])
-    return formatResult(runResult, language, filePath)
-  }
-
-  // For interpreted/run languages, just pass the file
-  args.push(filePath)
-
-  const result = await runCommand(command, args)
+  const args = [...langConfig.args, filePath]
+  const result = await runCommand(langConfig.command, args)
   return formatResult(result, language, filePath)
 }
 
 // ─── Execute Code Snippet ──────────────────────────────────────────
-// Execute a code snippet directly (for /exec command)
 export async function executeCode(code: string, language: string): Promise<string> {
-  const langConfig = languageCommands[language]
+  const tmpFile = `/tmp/ai-cli-exec-${Date.now()}`
 
-  if (!langConfig) {
-    return `Error: Unsupported language "${language}"`
+  // Map language to extension
+  const extMap: Record<string, string> = {
+    python: '.py',
+    javascript: '.js',
+    typescript: '.ts',
+    go: '.go',
+    rust: '.rs',
+    ruby: '.rb',
+    bash: '.sh',
+    sh: '.sh',
+    php: '.php',
+    c: '.c',
+    cpp: '.cpp',
   }
 
-  // For interpreted languages, we can pipe code to stdin
-  // For compiled languages, we'd need to write to a temp file
-  const command = langConfig.command
-  const args = [...(langConfig.args || [])]
+  const ext = extMap[language]
+  if (!ext) {
+    return `Error: Unsupported language "${language}"\nSupported: python, javascript, typescript, go, rust, ruby, bash, sh, php, c, cpp`
+  }
 
-  // For now, we'll just show a message that inline execution is not fully supported
-  // for all languages. In a full implementation, we'd create temp files.
-  return `Inline execution for ${language} not yet implemented. Please use /run <file> instead.`
+  const filePath = tmpFile + ext
+  await writeFile(filePath, code, 'utf-8')
+
+  try {
+    return await executeFile(filePath)
+  } finally {
+    await unlink(filePath).catch(() => {})
+    // Also clean up compiled binaries
+    await unlink('/tmp/ai-cli-out').catch(() => {})
+  }
 }
 
 // ─── Format Result ─────────────────────────────────────────────────
