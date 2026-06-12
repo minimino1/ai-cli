@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::io::{self, Read};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub fn read_file_content(path: &Path) -> Result<String> {
     let content = std::fs::read_to_string(path)?;

@@ -55,6 +55,9 @@ pub async fn execute(cmd: Commands, config: &Config) -> Result<()> {
         Commands::Template { action } => {
             handle_template(action).await
         }
+        Commands::Tui => {
+            crate::tui::run_tui(config).await
+        }
     }
 }
 

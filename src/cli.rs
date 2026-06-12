@@ -217,6 +217,9 @@ pub enum Commands {
         #[command(subcommand)]
         action: TemplateAction,
     },
+
+    /// Start interactive TUI mode
+    Tui,
 }
 
 #[derive(Subcommand, Debug)]

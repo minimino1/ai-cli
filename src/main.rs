@@ -4,6 +4,7 @@ mod context;
 mod providers;
 mod commands;
 mod utils;
+mod tui;
 
 use anyhow::Result;
 use clap::Parser;
@@ -26,10 +27,8 @@ async fn main() -> Result<()> {
     match cli.command {
         Some(cmd) => commands::execute(cmd, &config).await,
         None => {
-            // Interactive mode or show help
-            eprintln!("ai-cli - AI-powered code assistant");
-            eprintln!("Run 'ai --help' for usage information");
-            Ok(())
+            // Start TUI mode
+            tui::run_tui(&config).await
         }
     }
 }

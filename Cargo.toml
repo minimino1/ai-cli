@@ -29,6 +29,7 @@ toml = "0.8"
 
 # Config and paths
 dirs = "5.0"
+chrono = { version = "0.4", features = ["serde"] }
 
 # Git integration
 git2 = "0.19"
@@ -36,6 +37,8 @@ git2 = "0.19"
 # Terminal
 console = "0.15"
 colored = "2.1"
+ratatui = "0.29"
+crossterm = { version = "0.28", features = ["event-stream"] }
 
 # Error handling
 anyhow = "1.0"
