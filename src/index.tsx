@@ -10,6 +10,14 @@ async function loadConfig() {
     const configFile = Bun.file(configPath)
     if (await configFile.exists()) {
       const config = await configFile.json()
+      // Ensure providers is always an array
+      if (!Array.isArray(config.providers)) {
+        config.providers = defaultConfig.providers
+      }
+      // Ensure activeProvider is set
+      if (!config.activeProvider) {
+        config.activeProvider = defaultConfig.activeProvider
+      }
       return { ...defaultConfig, ...config }
     }
   } catch {}

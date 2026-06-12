@@ -215,7 +215,9 @@ export const commands: Command[] = [
     run: async (args, context) => {
       const providerName = args.trim()
       if (!providerName) {
-        const providers = context.config.providers.map(p =>
+        // Ensure providers is an array
+        const providersList = Array.isArray(context.config.providers) ? context.config.providers : []
+        const providers = providersList.map(p =>
           `  ${p.id} - ${p.name} (${p.model})`
         ).join('\n')
         return [{
@@ -224,7 +226,9 @@ export const commands: Command[] = [
         }]
       }
 
-      const provider = context.config.providers.find(p =>
+      // Ensure providers is an array
+      const providersList = Array.isArray(context.config.providers) ? context.config.providers : []
+      const provider = providersList.find(p =>
         p.id === providerName || p.name.toLowerCase() === providerName.toLowerCase()
       )
 
