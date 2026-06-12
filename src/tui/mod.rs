@@ -34,11 +34,14 @@ pub async fn run_tui(config: &Config) -> Result<()> {
 
     // Main loop
     loop {
+        // Check for pending AI responses (non-blocking)
+        app.check_pending_response();
+
         // Draw UI
         terminal.draw(|f| ui::render(f, &mut app))?;
 
         // Handle events
-        if event::poll(Duration::from_millis(100))? {
+        if event::poll(Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
                     handler::handle_key(&mut app, key).await?;

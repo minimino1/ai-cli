@@ -71,7 +71,7 @@ async fn handle_chat_input(app: &mut App, key: KeyEvent) -> Result<()> {
     match key.code {
         // Send message (Enter without Shift or Ctrl)
         KeyCode::Enter if !key.modifiers.contains(KeyModifiers::SHIFT) && !key.modifiers.contains(KeyModifiers::CONTROL) => {
-            app.send_message().await?;
+            app.start_send_message();
         }
 
         // Insert newline (Shift+Enter or Ctrl+Enter)

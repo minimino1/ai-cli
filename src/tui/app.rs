@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use super::highlight;
 use crate::tui::diff::Diff;
 use crate::tui::theme::Theme;
+use futures_util::future::FutureExt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ActivePanel {
@@ -54,6 +55,8 @@ pub struct App {
     pub current_theme: Theme,
     pub current_theme_index: usize,
     pub show_help: bool,
+    // Non-blocking async response handling
+    pub pending_request: Option<tokio::task::JoinHandle<Result<ChatResponse>>>,
 }
 
 impl App {
@@ -105,16 +108,18 @@ impl App {
             current_theme,
             current_theme_index,
             show_help: false,
+            pending_request: None,
         })
     }
 
-    pub async fn send_message(&mut self) -> Result<()> {
+    /// Start sending a message (non-blocking)
+    pub fn start_send_message(&mut self) {
         let input = self.input.trim().to_string();
         if input.is_empty() {
-            return Ok(());
+            return;
         }
 
-        // Add user message
+        // Add user message immediately
         let content = input.clone();
         let highlighted_lines = highlight::highlight_markdown(&content);
         self.messages.push(ChatMessage {
@@ -135,78 +140,116 @@ impl App {
         self.is_loading = true;
         self.status_message = "Thinking...".to_string();
 
-        // Get AI response
-        let response = self.get_ai_response(&input).await;
+        // Clone config for async task
+        let config = self.config.clone();
+        let messages = self.messages.clone();
+        let input_clone = input;
 
-        self.is_loading = false;
+        // Spawn async task
+        let handle = tokio::spawn(async move {
+            Self::get_ai_response_static(&config, &messages, &input_clone).await
+        });
 
-        match response {
-            Ok(response) => {
-                // Estimate tokens: ~4 chars per token
-                let tokens = response.content.len() / 4;
-                self.token_count += tokens;
-
-                let content = response.content;
-                let highlighted_lines = highlight::highlight_markdown(&content);
-                self.messages.push(ChatMessage {
-                    role: "AI".to_string(),
-                    content,
-                    timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
-                    highlighted_lines,
-                });
-                self.status_message = "Ready".to_string();
-
-                // Extract diffs from AI response
-                self.extract_diffs();
-            }
-            Err(e) => {
-                let content = format!("Failed: {}", e);
-                let highlighted_lines = highlight::highlight_markdown(&content);
-                self.messages.push(ChatMessage {
-                    role: "Error".to_string(),
-                    content,
-                    timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
-                    highlighted_lines,
-                });
-                self.status_message = format!("Error: {}", e);
-            }
-        }
-
-        Ok(())
+        self.pending_request = Some(handle);
     }
 
-    async fn get_ai_response(&self, input: &str) -> Result<ChatResponse> {
-        let provider_name = &self.config.default_provider;
-        let provider_config = self.config.get_provider(provider_name)?;
+    /// Check if there's a pending response and handle it
+    pub fn check_pending_response(&mut self) {
+        if let Some(handle) = &self.pending_request {
+            if handle.is_finished() {
+                // Take the handle out
+                let handle = self.pending_request.take().unwrap();
+                
+                // Get the result - JoinHandle returns Result<T, JoinError>
+                match handle.now_or_never() {
+                    Some(Ok(Ok(response))) => {
+                        // Estimate tokens: ~4 chars per token
+                        let tokens = response.content.len() / 4;
+                        self.token_count += tokens;
+
+                        let content = response.content;
+                        let highlighted_lines = highlight::highlight_markdown(&content);
+                        self.messages.push(ChatMessage {
+                            role: "AI".to_string(),
+                            content,
+                            timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+                            highlighted_lines,
+                        });
+                        self.status_message = "Ready".to_string();
+                        self.is_loading = false;
+
+                        // Extract diffs from AI response
+                        self.extract_diffs();
+                    }
+                    Some(Ok(Err(e))) => {
+                        let content = format!("Failed: {}", e);
+                        let highlighted_lines = highlight::highlight_markdown(&content);
+                        self.messages.push(ChatMessage {
+                            role: "Error".to_string(),
+                            content,
+                            timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+                            highlighted_lines,
+                        });
+                        self.status_message = format!("Error: {}", e);
+                        self.is_loading = false;
+                    }
+                    Some(Err(e)) => {
+                        let content = format!("Task failed: {}", e);
+                        let highlighted_lines = highlight::highlight_markdown(&content);
+                        self.messages.push(ChatMessage {
+                            role: "Error".to_string(),
+                            content,
+                            timestamp: chrono::Local::now().format("%H:%M:%S").to_string(),
+                            highlighted_lines,
+                        });
+                        self.status_message = format!("Task error: {}", e);
+                        self.is_loading = false;
+                    }
+                    None => {
+                        // Still pending, not ready yet
+                    }
+                }
+            }
+        }
+    }
+
+    /// Static version of get_ai_response for spawning
+    async fn get_ai_response_static(
+        config: &Config,
+        messages: &[ChatMessage],
+        input: &str,
+    ) -> Result<ChatResponse> {
+        let provider_name = &config.default_provider;
+        let provider_config = config.get_provider(provider_name)?;
         let provider = get_provider(provider_name, provider_config.api_key.as_deref())?;
 
-        let mut messages = Vec::new();
+        let mut chat_messages = Vec::new();
 
         // Add context from previous messages
-        for msg in self.messages.iter().rev().take(10) {
+        for msg in messages.iter().rev().take(10) {
             let role = if msg.role == "You" {
                 Role::User
             } else {
                 Role::Assistant
             };
-            messages.push(Message {
+            chat_messages.push(Message {
                 role,
                 content: msg.content.clone(),
             });
         }
 
         // Add current input
-        messages.push(Message {
+        chat_messages.push(Message {
             role: Role::User,
             content: input.to_string(),
         });
 
         let request = ChatRequest {
-            messages,
+            messages: chat_messages,
             model: provider_config
                 .model
                 .clone()
-                .unwrap_or_else(|| self.config.default_model.clone()),
+                .unwrap_or_else(|| config.default_model.clone()),
             max_tokens: provider_config.max_tokens,
             temperature: provider_config.temperature,
         };

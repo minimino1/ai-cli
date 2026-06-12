@@ -46,14 +46,6 @@ pub fn render(f: &mut Frame, app: &mut App) {
 
 fn render_header(f: &mut Frame, app: &App, area: Rect) {
     let theme = &app.current_theme;
-    let header = Block::default()
-        .title(" ai-cli v0.1.0 ")
-        .title_alignment(Alignment::Center)
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(theme.border));
-
-    let provider_text = format!("Provider: {}", app.config.default_provider);
-    let model_text = format!("Model: {}", app.config.default_model);
 
     let header_content = Layout::default()
         .direction(Direction::Horizontal)
@@ -64,13 +56,20 @@ fn render_header(f: &mut Frame, app: &App, area: Rect) {
         ])
         .split(area);
 
+    let header = Block::default()
+        .title(" ai-cli v0.1.0 ")
+        .title_alignment(Alignment::Center)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(theme.border));
     f.render_widget(header, area);
 
+    let provider_text = format!("Provider: {}", app.config.default_provider);
     let provider = Paragraph::new(provider_text)
         .alignment(Alignment::Center)
         .style(Style::default().fg(theme.accent));
     f.render_widget(provider, header_content[0]);
 
+    let model_text = format!("Model: {}", app.config.default_model);
     let model = Paragraph::new(model_text)
         .alignment(Alignment::Center)
         .style(Style::default().fg(theme.success));
@@ -274,13 +273,19 @@ fn render_input(f: &mut Frame, app: &App, area: Rect) {
 
 fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
     let theme = &app.current_theme;
-    let token_text = format!("Tokens: {}", app.token_count);
     
-    let mut status_parts = vec![
-        Span::styled(app.status_message.as_str(), Style::default().fg(theme.dim)),
-        Span::raw(" | "),
-        Span::styled(token_text, Style::default().fg(theme.accent)),
-    ];
+    let mut status_parts = vec![];
+    
+    // Show loading indicator
+    if app.is_loading {
+        status_parts.push(Span::styled("● Processing... ", Style::default().fg(theme.error)));
+    }
+    
+    status_parts.push(Span::styled(app.status_message.as_str(), Style::default().fg(theme.dim)));
+    status_parts.push(Span::raw(" | "));
+    
+    let token_text = format!("Tokens: {}", app.token_count);
+    status_parts.push(Span::styled(token_text, Style::default().fg(theme.accent)));
 
     if let Some(ref saved_msg) = app.session_saved_message {
         status_parts.push(Span::raw(" | "));
