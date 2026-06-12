@@ -323,6 +323,14 @@ export const App: React.FC<AppProps> = ({ config }) => {
           onSave={saveEditor}
           onCancel={closeEditor}
         />
+      ) : fileExplorerMode.active ? (
+        <FileExplorer
+          cwd={fileExplorerMode.cwd || process.cwd()}
+          onSelect={handleFileSelect}
+          onClose={() => setFileExplorerMode({ active: false })}
+          filterExt={fileExplorerMode.filterExt}
+          searchQuery={fileExplorerMode.searchQuery}
+        />
       ) : (
         <>
           {/* Main content area */}
@@ -413,18 +421,23 @@ export const App: React.FC<AppProps> = ({ config }) => {
                 <Box marginTop={1}>
                   <Text color={theme.textMuted}>Quick Actions</Text>
                 </Box>
-                <Box marginTop={1} flexDirection="column">
-                  <Text color={theme.text}>/review [file] - Review code</Text>
-                  <Text color={theme.text}>/explain [file] - Explain code</Text>
-                  <Text color={theme.text}>/fix [file] - Fix issues</Text>
-                  <Text color={theme.text}>/file [path] - Show file</Text>
-                  <Text color={theme.text}>/ls [path] - List files</Text>
-                  <Text color={theme.text}>/edit [file] - Edit file</Text>
-                  <Text color={theme.text}>/open [file] - View file</Text>
-                  <Text color={theme.text}>/provider - Switch provider</Text>
-                  <Text color={theme.text}>/clear - Clear chat</Text>
-                  <Text color={theme.text}>/help - Show help</Text>
-                </Box>
+                 <Box marginTop={1} flexDirection="column">
+                    <Text color={theme.text}>/review [file] - Review code</Text>
+                    <Text color={theme.text}>/explain [file] - Explain code</Text>
+                    <Text color={theme.text}>/fix [file] - Fix issues</Text>
+                    <Text color={theme.text}>/file [path] - Show file</Text>
+                    <Text color={theme.text}>/ls [path] - List files</Text>
+                    <Text color={theme.text}>/browse [path] - File browser</Text>
+                    <Text color={theme.text}>/sessions - List sessions</Text>
+                     <Text color={theme.text}>{'/load [id] - Load session'}</Text>
+                    <Text color={theme.text}>/save [title] - Save session</Text>
+                     <Text color={theme.text}>{'/delete [id] - Delete session'}</Text>
+                    <Text color={theme.text}>/edit [file] - Edit file</Text>
+                    <Text color={theme.text}>/open [file] - View file</Text>
+                    <Text color={theme.text}>/provider - Switch provider</Text>
+                    <Text color={theme.text}>/clear - Clear chat</Text>
+                    <Text color={theme.text}>/help - Show help</Text>
+                 </Box>
                 <Box marginTop={2}>
                   <Text color={theme.textMuted}>Keyboard Shortcuts</Text>
                 </Box>
