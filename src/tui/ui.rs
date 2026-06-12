@@ -9,34 +9,24 @@ use super::theme::Theme;
 pub fn render(f: &mut Frame, app: &mut App) {
     let area = f.area();
 
-    // Create main layout
+    // Main layout: vertical (header + content + footer)
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Header
+            Constraint::Length(1),  // Header
             Constraint::Min(10),   // Main content
-            Constraint::Length(3),  // Input
-            Constraint::Length(1),  // Status bar
+            Constraint::Length(1),  // Footer/Status bar
         ])
         .split(area);
 
     // Render header
     render_header(f, app, chunks[0]);
 
-    // Render main content based on active panel
-    match app.active_panel {
-        ActivePanel::Chat => render_chat(f, app, chunks[1]),
-        ActivePanel::FileExplorer => render_file_explorer(f, app, chunks[1]),
-        ActivePanel::CommandPalette => render_command_palette(f, app, chunks[1]),
-        ActivePanel::History => render_history(f, app, chunks[1]),
-        ActivePanel::DiffViewer => render_diff_viewer(f, app, chunks[1]),
-    }
+    // Render main content - horizontal split (main + sidebar)
+    render_main_content(f, app, chunks[1]);
 
-    // Render input
-    render_input(f, app, chunks[2]);
-
-    // Render status bar
-    render_status_bar(f, app, chunks[3]);
+    // Render footer/status bar
+    render_footer(f, app, chunks[2]);
 
     // Render help overlay if shown
     if app.show_help {
@@ -47,91 +37,92 @@ pub fn render(f: &mut Frame, app: &mut App) {
 fn render_header(f: &mut Frame, app: &App, area: Rect) {
     let theme = &app.current_theme;
 
-    let header_content = Layout::default()
+    let header_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Percentage(33),
-            Constraint::Percentage(33),
             Constraint::Percentage(34),
+            Constraint::Percentage(33),
         ])
         .split(area);
 
-    let header = Block::default()
-        .title(" ai-cli v0.1.0 ")
-        .title_alignment(Alignment::Center)
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(theme.border));
-    f.render_widget(header, area);
+    // Left: provider
+    let provider = Paragraph::new(format!(" {}", app.config.default_provider))
+        .style(Style::default().fg(theme.primary));
+    f.render_widget(provider, header_chunks[0]);
 
-    let provider_text = format!("Provider: {}", app.config.default_provider);
-    let provider = Paragraph::new(provider_text)
-        .alignment(Alignment::Center)
-        .style(Style::default().fg(theme.accent));
-    f.render_widget(provider, header_content[0]);
+    // Center: title
+    let title = Paragraph::new("ai-cli")
+        .style(Style::default().fg(theme.text).add_modifier(Modifier::BOLD))
+        .alignment(Alignment::Center);
+    f.render_widget(title, header_chunks[1]);
 
-    let model_text = format!("Model: {}", app.config.default_model);
-    let model = Paragraph::new(model_text)
-        .alignment(Alignment::Center)
-        .style(Style::default().fg(theme.success));
-    f.render_widget(model, header_content[1]);
+    // Right: model
+    let model = Paragraph::new(format!("{} ", app.config.default_model))
+        .style(Style::default().fg(theme.secondary))
+        .alignment(Alignment::Right);
+    f.render_widget(model, header_chunks[2]);
+}
 
-    let panel_name = match app.active_panel {
-        ActivePanel::Chat => "Chat",
-        ActivePanel::FileExplorer => "Files",
-        ActivePanel::CommandPalette => "Commands",
-        ActivePanel::History => "History",
-        ActivePanel::DiffViewer => "Diffs",
-    };
-    let panel = Paragraph::new(format!("Panel: {}", panel_name))
-        .alignment(Alignment::Center)
-        .style(Style::default().fg(theme.accent));
-    f.render_widget(panel, header_content[2]);
+fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
+    let theme = &app.current_theme.clone();
+
+    // Horizontal split: main content (left) + sidebar (right)
+    let main_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Min(50),   // Main content
+            Constraint::Length(30), // Sidebar
+        ])
+        .split(area);
+
+    // Main content area
+    match app.active_panel {
+        ActivePanel::Chat => render_chat(f, app, main_chunks[0]),
+        ActivePanel::FileExplorer => render_file_explorer(f, app, main_chunks[0]),
+        ActivePanel::CommandPalette => render_command_palette(f, app, main_chunks[0]),
+        ActivePanel::History => render_history(f, app, main_chunks[0]),
+        ActivePanel::DiffViewer => render_diff_viewer(f, app, main_chunks[0]),
+    }
+
+    // Sidebar
+    render_sidebar(f, app, main_chunks[1]);
 }
 
 fn render_chat(f: &mut Frame, app: &App, area: Rect) {
     let theme = &app.current_theme;
-    let chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
-        .split(area);
 
-    // Messages area
+    // Messages area (full width now)
     let messages: Vec<ListItem> = {
         let mut items = Vec::new();
         for msg in &app.messages {
-            let style = if msg.role == "You" {
-                Style::default().fg(Color::Cyan)
+            let (role_char, style) = if msg.role == "You" {
+                ("▸", Style::default().fg(theme.primary))
             } else if msg.role == "Error" {
-                Style::default().fg(Color::Red)
+                ("✗", Style::default().fg(theme.error))
             } else {
-                Style::default().fg(Color::Green)
+                ("●", Style::default().fg(theme.success))
             };
 
-            let prefix = format!("[{}] {}: ", msg.timestamp, msg.role);
-            let timestamp_span = Span::styled(
-                format!("[{}] ", msg.timestamp),
-                Style::default().fg(Color::DarkGray),
+            // Role indicator
+            let role_span = Span::styled(format!("{} ", role_char), style);
+            let role_name = Span::styled(
+                format!("{}: ", msg.role),
+                Style::default().fg(theme.text_muted),
             );
-            let role_span = Span::styled(format!("{}: ", msg.role), style);
 
             if msg.highlighted_lines.is_empty() {
-                // No content, just show prefix
-                let line = Line::from(vec![timestamp_span, role_span]);
+                let line = Line::from(vec![role_span, role_name]);
                 items.push(ListItem::new(line));
             } else {
-                // First line: prefix + first highlighted line
-                let mut first_spans = Vec::new();
-                first_spans.push(timestamp_span.clone());
-                first_spans.push(role_span.clone());
+                // First line with role
+                let mut first_spans = vec![role_span, role_name];
                 first_spans.extend(msg.highlighted_lines[0].spans.clone());
                 items.push(ListItem::new(Line::from(first_spans)));
 
-                // Remaining lines: indent + highlighted line
-                let prefix_len = prefix.len();
-                let indent = " ".repeat(prefix_len);
+                // Remaining lines with indent
                 for line in msg.highlighted_lines.iter().skip(1) {
-                    let mut line_spans = Vec::new();
-                    line_spans.push(Span::raw(indent.clone()));
+                    let mut line_spans = vec![Span::raw("  ")];
                     line_spans.extend(line.spans.clone());
                     items.push(ListItem::new(Line::from(line_spans)));
                 }
@@ -141,31 +132,117 @@ fn render_chat(f: &mut Frame, app: &App, area: Rect) {
     };
 
     let messages_list = List::new(messages)
-        .block(Block::default().title(" Messages ").borders(Borders::ALL))
+        .block(
+            Block::default()
+                .title(" Messages ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(theme.border)),
+        )
         .highlight_style(Style::default().add_modifier(Modifier::BOLD));
 
-    f.render_widget(messages_list, chunks[0]);
+    f.render_widget(messages_list, area);
+}
+
+fn render_sidebar(f: &mut Frame, app: &App, area: Rect) {
+    let theme = &app.current_theme;
+
+    let sidebar_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),  // Quick actions
+            Constraint::Min(5),    // File explorer
+            Constraint::Length(5), // Keyboard shortcuts
+        ])
+        .split(area);
 
     // Quick actions
     let actions = vec![
-        ListItem::new(Line::from(Span::styled("[f] Fix", Style::default().fg(theme.accent)))),
-        ListItem::new(Line::from(Span::styled("[e] Explain", Style::default().fg(theme.accent)))),
-        ListItem::new(Line::from(Span::styled("[c] Commit", Style::default().fg(theme.accent)))),
-        ListItem::new(Line::from(Span::styled("[r] Review", Style::default().fg(theme.accent)))),
-        ListItem::new(Line::from(Span::styled("[t] Test", Style::default().fg(theme.accent)))),
-        ListItem::new(Line::from("")),
-        ListItem::new(Line::from(Span::styled("[Tab] Files", Style::default().fg(theme.accent)))),
-        ListItem::new(Line::from(Span::styled("[Ctrl+P] Commands", Style::default().fg(theme.accent)))),
-        ListItem::new(Line::from(Span::styled("[Ctrl+H] History", Style::default().fg(theme.accent)))),
-        ListItem::new(Line::from(Span::styled("[Ctrl+S] Save", Style::default().fg(theme.accent)))),
-        ListItem::new(Line::from(Span::styled("[n/p] Diffs", Style::default().fg(theme.accent)))),
-        ListItem::new(Line::from(Span::styled("[q] Quit", Style::default().fg(theme.error)))),
+        ListItem::new(Line::from(vec![
+            Span::styled("f ", Style::default().fg(theme.accent)),
+            Span::styled("Fix", Style::default().fg(theme.text)),
+        ])),
+        ListItem::new(Line::from(vec![
+            Span::styled("e ", Style::default().fg(theme.accent)),
+            Span::styled("Explain", Style::default().fg(theme.text)),
+        ])),
+        ListItem::new(Line::from(vec![
+            Span::styled("c ", Style::default().fg(theme.accent)),
+            Span::styled("Commit", Style::default().fg(theme.text)),
+        ])),
+        ListItem::new(Line::from(vec![
+            Span::styled("r ", Style::default().fg(theme.accent)),
+            Span::styled("Review", Style::default().fg(theme.text)),
+        ])),
+        ListItem::new(Line::from(vec![
+            Span::styled("t ", Style::default().fg(theme.accent)),
+            Span::styled("Test", Style::default().fg(theme.text)),
+        ])),
     ];
 
-    let actions_list = List::new(actions)
-        .block(Block::default().title(" Quick Actions ").borders(Borders::ALL));
+    let actions_list = List::new(actions).block(
+        Block::default()
+            .title(" Quick ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(theme.border)),
+    );
+    f.render_widget(actions_list, sidebar_chunks[0]);
 
-    f.render_widget(actions_list, chunks[1]);
+    // File explorer
+    let files: Vec<ListItem> = app
+        .files
+        .iter()
+        .take(10)
+        .enumerate()
+        .map(|(i, file)| {
+            let icon = if file.is_dir { " " } else { " " };
+            let style = if i == app.file_selected {
+                Style::default().fg(theme.primary)
+            } else {
+                Style::default().fg(theme.text)
+            };
+
+            ListItem::new(Line::from(vec![
+                Span::raw(format!("{} ", icon)),
+                Span::styled(&file.name, style),
+            ]))
+        })
+        .collect();
+
+    let files_list = List::new(files).block(
+        Block::default()
+            .title(" Files ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(theme.border)),
+    );
+    f.render_widget(files_list, sidebar_chunks[1]);
+
+    // Keyboard shortcuts
+    let shortcuts = vec![
+        ListItem::new(Line::from(vec![
+            Span::styled("Tab ", Style::default().fg(theme.accent)),
+            Span::styled("panels", Style::default().fg(theme.text_muted)),
+        ])),
+        ListItem::new(Line::from(vec![
+            Span::styled("? ", Style::default().fg(theme.accent)),
+            Span::styled("help", Style::default().fg(theme.text_muted)),
+        ])),
+        ListItem::new(Line::from(vec![
+            Span::styled("Ctrl+s ", Style::default().fg(theme.accent)),
+            Span::styled("save", Style::default().fg(theme.text_muted)),
+        ])),
+        ListItem::new(Line::from(vec![
+            Span::styled("Ctrl+t ", Style::default().fg(theme.accent)),
+            Span::styled("theme", Style::default().fg(theme.text_muted)),
+        ])),
+    ];
+
+    let shortcuts_list = List::new(shortcuts).block(
+        Block::default()
+            .title(" Keys ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(theme.border)),
+    );
+    f.render_widget(shortcuts_list, sidebar_chunks[2]);
 }
 
 fn render_file_explorer(f: &mut Frame, app: &App, area: Rect) {
@@ -175,11 +252,11 @@ fn render_file_explorer(f: &mut Frame, app: &App, area: Rect) {
         .iter()
         .enumerate()
         .map(|(i, file)| {
-            let icon = if file.is_dir { "📁" } else { "📄" };
+            let icon = if file.is_dir { " " } else { " " };
             let style = if i == app.file_selected {
-                Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)
+                Style::default().fg(theme.primary)
             } else {
-                Style::default()
+                Style::default().fg(theme.text)
             };
 
             ListItem::new(Line::from(vec![
@@ -190,8 +267,13 @@ fn render_file_explorer(f: &mut Frame, app: &App, area: Rect) {
         .collect();
 
     let files_list = List::new(items)
-        .block(Block::default().title(" Files ").borders(Borders::ALL))
-        .highlight_style(Style::default().fg(theme.accent));
+        .block(
+            Block::default()
+                .title(" Files ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(theme.border)),
+        )
+        .highlight_style(Style::default().fg(theme.primary));
 
     f.render_widget(files_list, area);
 }
@@ -204,9 +286,9 @@ fn render_command_palette(f: &mut Frame, app: &App, area: Rect) {
         .enumerate()
         .map(|(i, cmd)| {
             let style = if i == app.command_selected {
-                Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)
+                Style::default().fg(theme.primary)
             } else {
-                Style::default()
+                Style::default().fg(theme.text)
             };
 
             ListItem::new(Line::from(Span::styled(cmd, style)))
@@ -214,8 +296,13 @@ fn render_command_palette(f: &mut Frame, app: &App, area: Rect) {
         .collect();
 
     let commands_list = List::new(items)
-        .block(Block::default().title(" Commands ").borders(Borders::ALL))
-        .highlight_style(Style::default().fg(theme.accent));
+        .block(
+            Block::default()
+                .title(" Commands ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(theme.border)),
+        )
+        .highlight_style(Style::default().fg(theme.primary));
 
     f.render_widget(commands_list, area);
 }
@@ -228,9 +315,9 @@ fn render_history(f: &mut Frame, app: &App, area: Rect) {
         .enumerate()
         .map(|(i, cmd)| {
             let style = if i == app.history_selected {
-                Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)
+                Style::default().fg(theme.primary)
             } else {
-                Style::default()
+                Style::default().fg(theme.text)
             };
 
             ListItem::new(Line::from(Span::styled(cmd, style)))
@@ -240,14 +327,70 @@ fn render_history(f: &mut Frame, app: &App, area: Rect) {
     let history_list = if items.is_empty() {
         List::new(vec![ListItem::new(Line::from(Span::styled(
             "No history yet",
-            Style::default().fg(theme.dim),
+            Style::default().fg(theme.text_muted),
         )))])
     } else {
         List::new(items)
     }
-    .block(Block::default().title(" History ").borders(Borders::ALL));
+    .block(
+        Block::default()
+            .title(" History ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(theme.border)),
+    );
 
     f.render_widget(history_list, area);
+}
+
+fn render_footer(f: &mut Frame, app: &App, area: Rect) {
+    let theme = &app.current_theme;
+
+    let footer_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Min(20),   // Status/Input
+            Constraint::Length(20), // Tokens
+            Constraint::Length(20), // Loading indicator
+        ])
+        .split(area);
+
+    // Left: Input/Status
+    if app.is_loading {
+        let loading = Paragraph::new(" ● Thinking...")
+            .style(Style::default().fg(theme.warning));
+        f.render_widget(loading, footer_chunks[0]);
+    } else {
+        let input_display = if app.input.is_empty() {
+            Span::styled(
+                " Press Enter to send...",
+                Style::default().fg(theme.text_muted),
+            )
+        } else {
+            Span::styled(
+                format!(" {}_", app.input),
+                Style::default().fg(theme.text),
+            )
+        };
+        let input = Paragraph::new(input_display);
+        f.render_widget(input, footer_chunks[0]);
+    }
+
+    // Center: Tokens
+    let tokens = Paragraph::new(format!("tok:{} ", app.token_count))
+        .style(Style::default().fg(theme.text_muted))
+        .alignment(Alignment::Right);
+    f.render_widget(tokens, footer_chunks[1]);
+
+    // Right: Status message or saved
+    let status_text = if let Some(ref saved_msg) = app.session_saved_message {
+        saved_msg.clone()
+    } else {
+        app.status_message.clone()
+    };
+    let status = Paragraph::new(format!("{} ", status_text))
+        .style(Style::default().fg(theme.text_muted))
+        .alignment(Alignment::Right);
+    f.render_widget(status, footer_chunks[2]);
 }
 
 fn render_input(f: &mut Frame, app: &App, area: Rect) {
@@ -255,10 +398,10 @@ fn render_input(f: &mut Frame, app: &App, area: Rect) {
     let input = Paragraph::new(app.input.as_str())
         .block(
             Block::default()
-                .title(" Input (Enter to send) ")
+                .title(" Input ")
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(if app.is_loading {
-                    theme.error
+                    theme.warning
                 } else {
                     theme.border
                 })),
@@ -271,41 +414,17 @@ fn render_input(f: &mut Frame, app: &App, area: Rect) {
     f.set_cursor_position((area.x + app.cursor_position as u16 + 1, area.y + 1));
 }
 
-fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
-    let theme = &app.current_theme;
-    
-    let mut status_parts = vec![];
-    
-    // Show loading indicator
-    if app.is_loading {
-        status_parts.push(Span::styled("● Processing... ", Style::default().fg(theme.error)));
-    }
-    
-    status_parts.push(Span::styled(app.status_message.as_str(), Style::default().fg(theme.dim)));
-    status_parts.push(Span::raw(" | "));
-    
-    let token_text = format!("Tokens: {}", app.token_count);
-    status_parts.push(Span::styled(token_text, Style::default().fg(theme.accent)));
-
-    if let Some(ref saved_msg) = app.session_saved_message {
-        status_parts.push(Span::raw(" | "));
-        status_parts.push(Span::styled(saved_msg, Style::default().fg(theme.success)));
-    }
-
-    let status = Line::from(status_parts);
-
-    let paragraph = Paragraph::new(status)
-        .alignment(Alignment::Left);
-
-    f.render_widget(paragraph, area);
-}
-
 fn render_diff_viewer(f: &mut Frame, app: &App, area: Rect) {
     let theme = &app.current_theme;
     if app.diffs.is_empty() {
         let empty = Paragraph::new("No diffs available")
             .alignment(Alignment::Center)
-            .block(Block::default().title(" Diff Viewer ").borders(Borders::ALL));
+            .block(
+                Block::default()
+                    .title(" Diff Viewer ")
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(theme.border)),
+            );
         f.render_widget(empty, area);
         return;
     }
@@ -314,8 +433,12 @@ fn render_diff_viewer(f: &mut Frame, app: &App, area: Rect) {
 
     // Build header with diff info
     let file_info = current_diff.file_path.as_deref().unwrap_or("Unknown file");
-    let stats = format!("+{} -{}", current_diff.additions_count(), current_diff.deletions_count());
-    let title = format!(" Diff Viewer: {} ({}) ", file_info, stats);
+    let stats = format!(
+        "+{} -{}",
+        current_diff.additions_count(),
+        current_diff.deletions_count()
+    );
+    let title = format!(" {} ({}) ", file_info, stats);
 
     let block = Block::default()
         .title(title)
@@ -335,10 +458,8 @@ fn render_diff_viewer(f: &mut Frame, app: &App, area: Rect) {
         width: area.width,
         height: 1,
     };
-    let hints = Paragraph::new(
-        "[n/p] Next/Prev diff  [j/k] Scroll  [Esc] Back"
-    )
-    .alignment(Alignment::Center)
-    .style(Style::default().fg(theme.dim));
+    let hints = Paragraph::new(" n/p: diff  j/k: scroll  Esc: back")
+        .alignment(Alignment::Center)
+        .style(Style::default().fg(theme.text_muted));
     f.render_widget(hints, hint_area);
 }
