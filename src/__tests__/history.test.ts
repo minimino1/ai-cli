@@ -32,9 +32,17 @@ describe("SessionManager", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset singleton
-    vi.mocked(SessionManager.getInstance).mockClear();
+    // Reset singleton instance
+    // @ts-ignore - accessing private static field
+    SessionManager.instance = undefined;
     manager = SessionManager.getInstance();
+    // Setup default mock implementations
+    mockFs.mkdir.mockResolvedValue(undefined);
+    mockFs.access.mockResolvedValue(true);
+    mockFs.writeFile.mockResolvedValue(undefined);
+    mockFs.readFile.mockResolvedValue("");
+    mockFs.unlink.mockResolvedValue(undefined);
+    mockFs.readdir.mockResolvedValue([]);
   });
 
   describe("singleton pattern", () => {
@@ -56,13 +64,13 @@ describe("SessionManager", () => {
       expect(id1).not.toBe(id2);
     });
 
-    it("should generate 32-character hex strings", () => {
+    it("should generate IDs with correct format", () => {
       const id = manager.generateId();
-      expect(id).toMatch(/^[a-f0-9]{32}$/);
+      expect(id).toMatch(/^session_\d+_[a-z0-9]+$/);
     });
 
     it("should generate different IDs on each call", () => {
-      const ids = new Set();
+      const ids = new Set<string>();
       for (let i = 0; i < 100; i++) {
         ids.add(manager.generateId());
       }
@@ -71,45 +79,95 @@ describe("SessionManager", () => {
   });
 
   describe("extractTitle", () => {
-    it("should extract title from first non-empty line", () => {
-      const content = "This is the title\nSecond line\nThird line";
-      expect(manager.extractTitle(content)).toBe("This is the title");
+    it("should extract title from first user message text", () => {
+      const messages: any[] = [
+        {
+          id: "1",
+          role: "user",
+          parts: [{ type: "text", text: "This is the title" }],
+          timestamp: new Date(),
+        },
+      ];
+      expect(manager.extractTitle(messages)).toBe("This is the title");
     });
 
-    it("should return empty string for empty content", () => {
-      expect(manager.extractTitle("")).toBe("");
+    it("should return 'Untitled Session' for empty messages", () => {
+      expect(manager.extractTitle([])).toBe("Untitled Session");
+    });
+
+    it("should return 'Untitled Session' when no user message", () => {
+      const messages: any[] = [
+        {
+          id: "1",
+          role: "assistant",
+          parts: [{ type: "text", text: "Hello" }],
+          timestamp: new Date(),
+        },
+      ];
+      expect(manager.extractTitle(messages)).toBe("Untitled Session");
+    });
+
+    it("should return 'Untitled Session' when user message has no text part", () => {
+      const messages: any[] = [
+        {
+          id: "1",
+          role: "user",
+          parts: [{ type: "code", language: "ts", code: "console.log('hi')" }],
+          timestamp: new Date(),
+        },
+      ];
+      expect(manager.extractTitle(messages)).toBe("Untitled Session");
+    });
+
+    it("should truncate long titles to 50 characters", () => {
+      const longText = "A".repeat(60);
+      const messages: any[] = [
+        {
+          id: "1",
+          role: "user",
+          parts: [{ type: "text", text: longText }],
+          timestamp: new Date(),
+        },
+      ];
+      const title = manager.extractTitle(messages);
+      expect(title.length).toBe(53); // 50 + "..."
+      expect(title.endsWith("...")).toBe(true);
+    });
+
+    it("should not truncate short titles", () => {
+      const messages: any[] = [
+        {
+          id: "1",
+          role: "user",
+          parts: [{ type: "text", text: "Short title" }],
+          timestamp: new Date(),
+        },
+      ];
+      expect(manager.extractTitle(messages)).toBe("Short title");
     });
 
     it("should trim whitespace from title", () => {
-      const content = "   Title with spaces   \nNext line";
-      expect(manager.extractTitle(content)).toBe("Title with spaces");
-    });
-
-    it("should handle single line content", () => {
-      expect(manager.extractTitle("Single line")).toBe("Single line");
-    });
-
-    it("should skip empty first lines", () => {
-      const content = "\n\n  \nActual title\nNext";
-      expect(manager.extractTitle(content)).toBe("Actual title");
-    });
-
-    it("should truncate long titles", () => {
-      const longTitle = "A".repeat(200);
-      const content = longTitle + "\nNext line";
-      const title = manager.extractTitle(content);
-      expect(title.length).toBeLessThanOrEqual(100);
+      const messages: any[] = [
+        {
+          id: "1",
+          role: "user",
+          parts: [{ type: "text", text: "   Title with spaces   " }],
+          timestamp: new Date(),
+        },
+      ];
+      expect(manager.extractTitle(messages)).toBe("Title with spaces");
     });
   });
 
   describe("saveSession", () => {
-    const mockSession: Session = {
-      id: "test123",
-      title: "Test Session",
-      messages: [],
-      createdAt: new Date("2024-01-01T00:00:00Z"),
-      updatedAt: new Date("2024-01-01T00:00:00Z"),
-    };
+    const messages: any[] = [
+      {
+        id: "1",
+        role: "user",
+        parts: [{ type: "text", text: "Test message" }],
+        timestamp: new Date(),
+      },
+    ];
 
     beforeEach(() => {
       mockFs.mkdir.mockResolvedValue(undefined);
@@ -117,34 +175,64 @@ describe("SessionManager", () => {
     });
 
     it("should write session to file", async () => {
-      await manager.saveSession(mockSession);
+      const id = await manager.saveSession(messages);
 
       expect(mockFs.mkdir).toHaveBeenCalledWith(mockSessionsDir, { recursive: true });
       expect(mockFs.writeFile).toHaveBeenCalledWith(
-        `${mockSessionsDir}/test123.json`,
+        `${mockSessionsDir}/${id}.json`,
         expect.any(String)
       );
     });
 
     it("should store session in memory cache", async () => {
-      await manager.saveSession(mockSession);
-      expect(manager.sessions.get("test123")).toBe(mockSession);
+      const id = await manager.saveSession(messages);
+      expect(manager.sessions.has(id)).toBe(true);
+      const session = manager.sessions.get(id);
+      expect(session?.messages).toEqual(messages);
     });
 
     it("should serialize dates correctly", async () => {
-      await manager.saveSession(mockSession);
+      const id = await manager.saveSession(messages);
 
       const writtenContent = mockFs.writeFile.mock.calls[0][1] as string;
       const parsed = JSON.parse(writtenContent);
 
-      expect(parsed.createdAt).toBe("2024-01-01T00:00:00.000Z");
-      expect(parsed.updatedAt).toBe("2024-01-01T00:00:00.000Z");
+      expect(parsed.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+      expect(parsed.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
     });
 
     it("should handle save errors gracefully", async () => {
       mockFs.writeFile.mockRejectedValueOnce(new Error("Write failed"));
 
-      await expect(manager.saveSession(mockSession)).rejects.toThrow("Write failed");
+      await expect(manager.saveSession(messages)).rejects.toThrow("Write failed");
+    });
+
+    it("should preserve createdAt when updating existing session", async () => {
+      const existingId = "existing123";
+      const existingSession = {
+        id: existingId,
+        title: "Old Title",
+        messages: [],
+        createdAt: new Date("2020-01-01T00:00:00Z"),
+        updatedAt: new Date("2020-01-01T00:00:00Z"),
+      };
+      manager.sessions.set(existingId, existingSession);
+
+      const newMessages: any[] = [
+        {
+          id: "2",
+          role: "user",
+          parts: [{ type: "text", text: "New message" }],
+          timestamp: new Date(),
+        },
+      ];
+
+      const id = await manager.saveSession(newMessages, existingId);
+
+      expect(id).toBe(existingId);
+      const session = manager.sessions.get(existingId);
+      expect(session?.createdAt.getTime()).toBe(new Date("2020-01-01T00:00:00Z").getTime());
+      expect(session?.updatedAt.getTime()).toBeCloseTo(new Date().getTime(), -3);
     });
   });
 
@@ -183,10 +271,10 @@ describe("SessionManager", () => {
       expect(mockFs.readFile).toHaveBeenCalledTimes(1);
     });
 
-    it("should return undefined for non-existent session", async () => {
+    it("should return null for non-existent session", async () => {
       mockFs.readFile.mockRejectedValueOnce(new Error("File not found"));
       const session = await manager.loadSession("nonexistent");
-      expect(session).toBeUndefined();
+      expect(session).toBeNull();
     });
 
     it("should handle corrupted JSON", async () => {

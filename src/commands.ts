@@ -1,8 +1,24 @@
 import { readFile, readdir, mkdir, rm, stat, rename, writeFile } from 'node:fs/promises'
-import { join, extname, basename, dirname } from 'node:path'
-import type { Command, CommandContext, MessagePart, Config, Message, Session } from './types'
+import { join, extname, basename, dirname, isAbsolute } from 'node:path'
+import type { Command, CommandContext, MessagePart, Config, Message, Session, Provider } from './types'
 import { sendToAI } from './providers/ai'
 import { SessionManager } from './history'
+
+// Helper to safely get provider from config
+function getProviderSafely(config: Config, providerId?: string): { success: boolean; provider?: Provider; error?: string } {
+  const providersList = Array.isArray(config.providers) ? config.providers : []
+  const id = providerId || config.activeProvider
+  const provider = providersList.find(p => p.id === id)
+
+  if (!provider) {
+    return {
+      success: false,
+      error: `Provider not found: ${id}. Available: ${providersList.map(p => p.id).join(', ')}`,
+    }
+  }
+
+  return { success: true, provider }
+}
 
 // Command history (in-memory for session)
 let commandHistory: string[] = []
@@ -14,6 +30,14 @@ const userAliases = new Map<string, string>()
 import * as gitProvider from './providers/git'
 import { executeCommand } from './providers/shell'
 import { executeFile, executeCode } from './providers/execute'
+import { networkCommands } from './commands/network'
+import { systemCommands } from './commands/system'
+import { fileCommands } from './commands/files'
+import { gitAdvancedCommands } from './commands/git-advanced'
+import { termuxCommands } from './commands/termux'
+import { reviewEnhancedCommands } from './commands/review-enhanced'
+import { pluginCommands } from './commands/plugin'
+import { themeCommands } from './commands/theme'
 
 // ─── Helper: Read File ───────────────────────────────────────────
 async function readFileContent(path: string): Promise<string> {
@@ -96,7 +120,7 @@ function detectLanguage(filename: string): string {
 }
 
 // ─── Commands ────────────────────────────────────────────────────
-export const commands: Command[] = [
+export const builtinCommands: Command[] = [
   // /review - Code review
   {
     name: 'review',
@@ -108,22 +132,28 @@ export const commands: Command[] = [
       const content = await readFileContent(filePath)
       const language = detectLanguage(filePath)
 
-      const userParts: MessagePart[] = [{
-        type: 'file',
-        filename: filePath,
-        content,
-        language,
-      }]
+       const userParts: MessagePart[] = [{
+         type: 'file',
+         filename: filePath,
+         content,
+         language,
+       }]
 
-      return sendToAI([{
-        id: Date.now().toString(),
-        role: 'user',
-        parts: [
-          ...userParts,
-          { type: 'text', text: `Please review this code for bugs, security issues, performance problems, and best practices. File: ${filePath}` },
-        ],
-        timestamp: new Date(),
-      }], context.config.providers.find(p => p.id === context.config.activeProvider)!)
+       const providerResult = getProviderSafely(context.config)
+       if (!providerResult.success) {
+         return [{ type: 'text', text: providerResult.error }]
+       }
+       const { provider } = providerResult
+
+       return sendToAI([{
+         id: Date.now().toString(),
+         role: 'user',
+         parts: [
+           ...userParts,
+           { type: 'text', text: `Please review this code for bugs, security issues, performance problems, and best practices. File: ${filePath}` },
+         ],
+         timestamp: new Date(),
+       }], provider)
     },
   },
 
@@ -134,19 +164,25 @@ export const commands: Command[] = [
     aliases: ['e'],
     args: ['[file]'],
     run: async (args, context) => {
-      const filePath = args.trim() || '.'
-      const content = await readFileContent(filePath)
-      const language = detectLanguage(filePath)
+       const filePath = args.trim() || '.'
+       const content = await readFileContent(filePath)
+       const language = detectLanguage(filePath)
 
-      return sendToAI([{
-        id: Date.now().toString(),
-        role: 'user',
-        parts: [
-          { type: 'file', filename: filePath, content, language },
-          { type: 'text', text: `Please explain how this code works. File: ${filePath}` },
-        ],
-        timestamp: new Date(),
-      }], context.config.providers.find(p => p.id === context.config.activeProvider)!)
+       const providerResult = getProviderSafely(context.config)
+       if (!providerResult.success) {
+         return [{ type: 'text', text: providerResult.error }]
+       }
+       const { provider } = providerResult
+
+       return sendToAI([{
+         id: Date.now().toString(),
+         role: 'user',
+         parts: [
+           { type: 'file', filename: filePath, content, language },
+           { type: 'text', text: `Please explain how this code works. File: ${filePath}` },
+         ],
+         timestamp: new Date(),
+       }], provider)
     },
   },
 
@@ -157,19 +193,25 @@ export const commands: Command[] = [
     aliases: ['f'],
     args: ['[file]'],
     run: async (args, context) => {
-      const filePath = args.trim() || '.'
-      const content = await readFileContent(filePath)
-      const language = detectLanguage(filePath)
+       const filePath = args.trim() || '.'
+       const content = await readFileContent(filePath)
+       const language = detectLanguage(filePath)
 
-      return sendToAI([{
-        id: Date.now().toString(),
-        role: 'user',
-        parts: [
-          { type: 'file', filename: filePath, content, language },
-          { type: 'text', text: `Please fix any issues in this code. Provide the fixes as a diff. File: ${filePath}` },
-        ],
-        timestamp: new Date(),
-      }], context.config.providers.find(p => p.id === context.config.activeProvider)!)
+       const providerResult = getProviderSafely(context.config)
+       if (!providerResult.success) {
+         return [{ type: 'text', text: providerResult.error }]
+       }
+       const { provider } = providerResult
+
+       return sendToAI([{
+         id: Date.now().toString(),
+         role: 'user',
+         parts: [
+           { type: 'file', filename: filePath, content, language },
+           { type: 'text', text: `Please fix any issues in this code. Provide the fixes as a diff. File: ${filePath}` },
+         ],
+         timestamp: new Date(),
+       }], provider)
     },
   },
 
@@ -260,31 +302,29 @@ export const commands: Command[] = [
     },
   },
 
-   // /provider - Switch provider
-   {
-     name: 'provider',
-     description: 'Switch AI provider',
-     aliases: ['model'],
-     args: ['[provider]'],
-     run: async (args, context) => {
-       const providerName = args.trim()
-       if (!providerName) {
-         // Ensure providers is an array
-         const providersList = Array.isArray(context.config.providers) ? context.config.providers : []
-         const providers = providersList.map(p =>
-           `  ${p.id} - ${p.name} (${p.model})`
-         ).join('\n')
-         return [{
-           type: 'text',
-           text: `Available providers:\n${providers}\n\nCurrent: ${context.config.activeProvider}`,
-         }]
-       }
+    // /provider - Switch provider
+    {
+      name: 'provider',
+      description: 'Switch AI provider',
+      aliases: ['model'],
+      args: ['[provider]'],
+      run: async (args, context) => {
+        const providerName = args.trim()
+        const providersList = Array.isArray(context.config.providers) ? context.config.providers : []
 
-       // Ensure providers is an array
-       const providersList = Array.isArray(context.config.providers) ? context.config.providers : []
-       const provider = providersList.find(p =>
-         p.id === providerName || p.name.toLowerCase() === providerName.toLowerCase()
-       )
+        if (!providerName) {
+          const providers = providersList.map(p =>
+            `  ${p.id} - ${p.name} (${p.model})`
+          ).join('\n')
+          return [{
+            type: 'text',
+            text: `Available providers:\n${providers}\n\nCurrent: ${context.config.activeProvider}`,
+          }]
+        }
+
+        const provider = providersList.find(p =>
+          p.id === providerName || p.name.toLowerCase() === providerName.toLowerCase()
+        )
 
         if (!provider) {
           return [{
@@ -298,8 +338,8 @@ export const commands: Command[] = [
           type: 'text',
           text: `Switched to ${provider.name} (${provider.model})`,
         }]
-     },
-   },
+      },
+    },
 
    // /git - Git operations
    {
@@ -452,7 +492,6 @@ export const commands: Command[] = [
       run: async (args, context) => {
         const targetPath = args.trim() || process.env.HOME || process.cwd()
         try {
-          const { isAbsolute } = await import('node:path')
           const resolvedPath = isAbsolute(targetPath)
             ? targetPath
             : join(context.cwd, targetPath)
@@ -717,6 +756,18 @@ export const commands: Command[] = [
     },
   ]
 
+export const commands: Command[] = [
+  ...builtinCommands,
+  ...networkCommands,
+  ...systemCommands,
+  ...fileCommands,
+  ...gitAdvancedCommands,
+  ...termuxCommands,
+  ...reviewEnhancedCommands,
+  ...pluginCommands,
+  ...themeCommands,
+]
+
 // ─── Command Parser ──────────────────────────────────────────────
 export function parseCommand(input: string): { command: Command; args: string } | null {
   if (!input.startsWith('/')) return null
@@ -757,17 +808,24 @@ export function createContext(
     setFileExplorerMode?: (mode: { active: boolean; cwd?: string; filterExt?: string; searchQuery?: string; onSelect?: (path: string) => void }) => void
   }
 ): CommandContext {
-  return {
-    config,
-    cwd,
-    readFile: readFileContent,
-    listFiles,
-    sendToAI: (parts) => sendToAI([{
-      id: Date.now().toString(),
-      role: 'user',
-      parts,
-      timestamp: new Date(),
-    }], config.providers.find(p => p.id === config.activeProvider)!),
-    ...deps,
-  }
+   return {
+     config,
+     cwd,
+     readFile: readFileContent,
+     listFiles,
+     sendToAI: (parts) => {
+       const providerResult = getProviderSafely(config)
+       if (!providerResult.success) {
+         throw new Error(providerResult.error)
+       }
+       const { provider } = providerResult
+       return sendToAI([{
+         id: Date.now().toString(),
+         role: 'user',
+         parts,
+         timestamp: new Date(),
+       }], provider)
+     },
+     ...deps,
+   }
 }

@@ -267,6 +267,20 @@ export const pstreeCommand: Command = {
     const tree = await (await import('../tools/system/process')).treeProcesses()
     const { formatProcessTree } = await import('../tools/system/process')
 
-    return [{ type: 'text', text: formatProcessTree(tree) }]
-  },
-}
+   return [{ type: 'text', text: formatProcessTree(tree) }]
+   },
+ }
+
+// Export all system commands as an array
+export const systemCommands: Command[] = [
+  sysinfoCommand,
+  topCommand,
+  killCommand,
+  dfCommand,
+  freeCommand,
+  uptimeCommand,
+  netstatCommand,
+  monitorCommand,
+  psCommand,
+  pstreeCommand,
+]

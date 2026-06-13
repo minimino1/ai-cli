@@ -5,6 +5,13 @@ import { extname } from 'node:path'
 import { writeFile, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 
+// Generate a unique temporary binary path
+function getTempBinaryPath(): string {
+  const timestamp = Date.now()
+  const random = Math.random().toString(36).substring(2, 11)
+  return `/tmp/ai-cli-out-${timestamp}-${random}`
+}
+
 export interface ExecuteResult {
   success: boolean
   exitCode: number
@@ -105,87 +112,91 @@ async function runCommand(
     return data
   }
 
-  const stdoutPromise = subprocess.stdout ? readStream(subprocess.stdout) : Promise.resolve('')
-  const stderrPromise = subprocess.stderr ? readStream(subprocess.stderr) : Promise.resolve('')
+   const stdoutPromise = subprocess.stdout ? readStream(subprocess.stdout) : Promise.resolve('')
+   const stderrPromise = subprocess.stderr ? readStream(subprocess.stderr) : Promise.resolve('')
 
-  // Wait for exit with timeout
-  let exitCode: number
-  try {
-    const [, , exit] = await Promise.race([
-      stdoutPromise.then(s => { stdout = s }),
-      stderrPromise.then(s => { stderr = s }),
-      Promise.race([
-        subprocess.exited,
-        new Promise<never>((_, reject) => {
-          setTimeout(() => {
-            timedOut = true
-            subprocess.kill('SIGKILL')
-            reject(new Error('timeout'))
-          }, timeoutMs)
-        })
-      ])
-    ])
-    exitCode = exit as number
-  } catch (err: any) {
-    await Promise.all([stdoutPromise, stderrPromise])
-    if (err.message === 'timeout') {
-      await new Promise(resolve => setTimeout(resolve, 100))
-      exitCode = -1
-    } else {
-      throw err
-    }
-  }
+   // Create timeout promise
+   const timeoutPromise = new Promise<never>((_, reject) => {
+     setTimeout(() => {
+       timedOut = true
+       subprocess.kill('SIGKILL')
+       reject(new Error('timeout'))
+     }, timeoutMs)
+   })
 
-  if (!stdout) stdout = await stdoutPromise
-  if (!stderr) stderr = await stderrPromise
+   let exitCode: number
+   try {
+     // Wait for both streams and exit (with timeout)
+     const [stdoutResult, stderrResult, exit] = await Promise.all([
+       stdoutPromise,
+       stderrPromise,
+       Promise.race([subprocess.exited, timeoutPromise])
+     ])
+     stdout = stdoutResult
+     stderr = stderrResult
+     exitCode = exit as number
+   } catch (err: any) {
+     // Ensure streams are drained on timeout or other errors
+     await Promise.all([stdoutPromise, stderrPromise])
+     if (err.message === 'timeout') {
+       // Give process a moment to clean up
+       await new Promise(resolve => setTimeout(resolve, 100))
+       exitCode = -1
+     } else {
+       throw err
+     }
+   }
 
-  return {
-    success: exitCode === 0,
-    exitCode,
-    stdout: stdout.trim(),
-    stderr: stderr.trim(),
-    language: '',
-    command: `${command} ${args.join(' ')}`,
-    timedOut,
-  }
+   return {
+     success: exitCode === 0,
+     exitCode,
+     stdout: stdout.trim(),
+     stderr: stderr.trim(),
+     language: '',
+     command: `${command} ${args.join(' ')}`,
+     timedOut,
+   }
 }
 
 // ─── Execute File ──────────────────────────────────────────────────
 export async function executeFile(filePath: string): Promise<string> {
   const language = detectLanguage(filePath)
 
-  // Handle C (compile then run)
-  if (language === 'c') {
-    const compileResult = await runCommand('gcc', ['-o', '/tmp/ai-cli-out', filePath])
-    if (!compileResult.success) {
-      return `Compilation failed:\n${compileResult.stderr}`
-    }
-    const runResult = await runCommand('/tmp/ai-cli-out', [])
-    await unlink('/tmp/ai-cli-out').catch(() => {})
-    return formatResult(runResult, language, filePath)
-  }
+   // Handle C (compile then run)
+   if (language === 'c') {
+     const binaryPath = getTempBinaryPath()
+     const compileResult = await runCommand('gcc', ['-o', binaryPath, filePath])
+     if (!compileResult.success) {
+       return `Compilation failed:\n${compileResult.stderr}`
+     }
+     const runResult = await runCommand(binaryPath, [])
+     await unlink(binaryPath).catch(() => {})
+     return formatResult(runResult, language, filePath)
+   }
 
-  // Handle C++ (compile then run)
-  if (language === 'cpp') {
-    const compileResult = await runCommand('g++', ['-o', '/tmp/ai-cli-out', filePath])
-    if (!compileResult.success) {
-      return `Compilation failed:\n${compileResult.stderr}`
-    }
-    const runResult = await runCommand('/tmp/ai-cli-out', [])
-    await unlink('/tmp/ai-cli-out').catch(() => {})
-    return formatResult(runResult, language, filePath)
-  }
+   // Handle C++ (compile then run)
+   if (language === 'cpp') {
+     const binaryPath = getTempBinaryPath()
+     const compileResult = await runCommand('g++', ['-o', binaryPath, filePath])
+     if (!compileResult.success) {
+       return `Compilation failed:\n${compileResult.stderr}`
+     }
+     const runResult = await runCommand(binaryPath, [])
+     await unlink(binaryPath).catch(() => {})
+     return formatResult(runResult, language, filePath)
+   }
 
-  // Handle Rust (compile then run with rustc)
-  if (language === 'rust') {
-    const compileResult = await runCommand('rustc', ['-o', '/tmp/ai-cli-out', filePath])
-    if (!compileResult.success) {
-      return `Compilation failed:\n${compileResult.stderr}`
-    }
-    const runResult = await runCommand('/tmp/ai-cli-out', [])
-    await unlink('/tmp/ai-cli-out').catch(() => {})
-    return formatResult(runResult, language, filePath)
-  }
+   // Handle Rust (compile then run with rustc)
+   if (language === 'rust') {
+     const binaryPath = getTempBinaryPath()
+     const compileResult = await runCommand('rustc', ['-o', binaryPath, filePath])
+     if (!compileResult.success) {
+       return `Compilation failed:\n${compileResult.stderr}`
+     }
+     const runResult = await runCommand(binaryPath, [])
+     await unlink(binaryPath).catch(() => {})
+     return formatResult(runResult, language, filePath)
+   }
 
   // Handle Java (compile then run)
   if (language === 'java') {
@@ -234,17 +245,15 @@ export async function executeCode(code: string, language: string): Promise<strin
     return `Error: Unsupported language "${language}"\nSupported: python, javascript, typescript, go, rust, ruby, bash, sh, php, c, cpp`
   }
 
-  const filePath = tmpFile + ext
-  await writeFile(filePath, code, 'utf-8')
+   const filePath = tmpFile + ext
+   await writeFile(filePath, code, 'utf-8')
 
-  try {
-    return await executeFile(filePath)
-  } finally {
-    await unlink(filePath).catch(() => {})
-    // Also clean up compiled binaries
-    await unlink('/tmp/ai-cli-out').catch(() => {})
-  }
-}
+   try {
+     return await executeFile(filePath)
+   } finally {
+     await unlink(filePath).catch(() => {})
+   }
+ }
 
 // ─── Format Result ─────────────────────────────────────────────────
 function formatResult(

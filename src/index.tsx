@@ -26,6 +26,10 @@ async function loadConfig() {
 
 async function main() {
   const config = await loadConfig()
+  // Ensure defaults
+  if (!config.providers) config.providers = defaultConfig.providers
+  if (!config.activeProvider) config.activeProvider = defaultConfig.activeProvider
+  if (!config.theme) config.theme = 'dark'
 
   // Check if stdin supports raw mode
   const isRawModeSupported = process.stdin.isTTY && typeof process.stdin.setRawMode === 'function'

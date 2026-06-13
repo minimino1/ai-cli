@@ -403,17 +403,20 @@ function setupFileWatcher(filePath: string, pluginName: string): void {
   }
 
   try {
-    const { watch } = require('node:fs')
-    const watcher = watch(filePath, (eventType, filename) => {
-      if (eventType === 'change') {
-        console.log(`[PluginLoader] Plugin file changed: ${pluginName}, reloading...`)
-        reloadPlugin(pluginName).catch((error) => {
-          console.error(`[PluginLoader] Failed to reload plugin ${pluginName}:`, error)
-        })
-      }
-    })
+    import('node:fs').then(({ watch }) => {
+      const watcher = watch(filePath, (eventType, filename) => {
+        if (eventType === 'change') {
+          console.log(`[PluginLoader] Plugin file changed: ${pluginName}, reloading...`)
+          reloadPlugin(pluginName).catch((error) => {
+            console.error(`[PluginLoader] Failed to reload plugin ${pluginName}:`, error)
+          })
+        }
+      })
 
-    watchers.set(filePath, { close: () => watcher.close() })
+      watchers.set(filePath, { close: () => watcher.close() })
+    }).catch(error => {
+      console.warn(`[PluginLoader] File watching not available for ${pluginName}:`, error)
+    })
   } catch (error) {
     console.warn(`[PluginLoader] File watching not available for ${pluginName}:`, error)
   }
@@ -421,41 +424,46 @@ function setupFileWatcher(filePath: string, pluginName: string): void {
 
 // ─── Start Watching Plugins Directory ─────────────────────────────────
 export function startWatching(): void {
-  const fs = require('node:fs')
-  const path = require('node:path')
+  import('node:fs').then(({ watch }) => {
+    import('node:path').then(({ join, extname }) => {
+      try {
+        const watcher = watch(pluginsDir, { recursive: true }, (eventType, filename) => {
+          if (!filename) return
 
-  try {
-    const watcher = fs.watch(pluginsDir, { recursive: true }, (eventType, filename) => {
-      if (!filename) return
+          const fullPath = join(pluginsDir, filename)
+          const ext = extname(filename).toLowerCase()
 
-      const fullPath = path.join(pluginsDir, filename)
-      const ext = path.extname(filename).toLowerCase()
+          if (!['.ts', '.js', '.mjs', '.cjs'].includes(ext)) return
 
-      if (!['.ts', '.js', '.mjs', '.cjs'].includes(ext)) return
-
-      if (eventType === 'change') {
-        // Reload the changed plugin
-        const pluginName = pluginFiles.get(fullPath)
-        if (pluginName) {
-          console.log(`[PluginLoader] Plugin file changed: ${pluginName}, reloading...`)
-          reloadPlugin(pluginName).catch((error) => {
-            console.error(`[PluginLoader] Failed to reload plugin ${pluginName}:`, error)
-          })
-        }
-      } else if (eventType === 'rename') {
-        // Plugin added or removed
-        console.log(`[PluginLoader] Plugins directory changed, rescanning...`)
-        loadAllPlugins().catch((error) => {
-          console.error('[PluginLoader] Failed to rescan plugins:', error)
+          if (eventType === 'change') {
+            // Reload the changed plugin
+            const pluginName = pluginFiles.get(fullPath)
+            if (pluginName) {
+              console.log(`[PluginLoader] Plugin file changed: ${pluginName}, reloading...`)
+              reloadPlugin(pluginName).catch((error) => {
+                console.error(`[PluginLoader] Failed to reload plugin ${pluginName}:`, error)
+              })
+            }
+          } else if (eventType === 'rename') {
+            // Plugin added or removed
+            console.log(`[PluginLoader] Plugins directory changed, rescanning...`)
+            loadAllPlugins().catch((error) => {
+              console.error('[PluginLoader] Failed to rescan plugins:', error)
+            })
+          }
         })
-      }
-    })
 
-    // Store watcher reference
-    watchers.set('plugins-dir', { close: () => watcher.close() })
-  } catch (error) {
+        // Store watcher reference
+        watchers.set('plugins-dir', { close: () => watcher.close() })
+      } catch (error) {
+        console.warn('[PluginLoader] File watching not available:', error)
+      }
+    }).catch(error => {
+      console.warn('[PluginLoader] File watching not available:', error)
+    })
+  }).catch(error => {
     console.warn('[PluginLoader] File watching not available:', error)
-  }
+  })
 }
 
 // ─── Stop Watching ────────────────────────────────────────────────────
