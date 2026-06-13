@@ -1,8 +1,30 @@
 import { readFile, readdir, mkdir, rm, stat, rename, writeFile } from 'node:fs/promises'
-import { join, extname, basename, dirname } from 'node:path'
-import type { Command, CommandContext, MessagePart, Config, Message, Session } from './types'
+import { join, extname, basename, dirname, isAbsolute } from 'node:path'
+import type { Command, CommandContext, MessagePart, Config, Message, Session, Provider } from './types'
 import { sendToAI } from './providers/ai'
 import { SessionManager } from './history'
+
+/**
+ * Wählt anhand der übergebenen Konfiguration einen Provider aus und prüft, ob er vorhanden ist.
+ *
+ * @param config - Konfiguration, die `providers` (optional) und `activeProvider` enthalten kann
+ * @param providerId - Optionaler Provider-Id-Override; falls nicht gesetzt wird `config.activeProvider` verwendet
+ * @returns `{ success: true, provider }` wenn ein passender Provider gefunden wurde; `{ success: false, error }` sonst — die Fehlermeldung enthält die angefragte Id und die Liste verfügbarer Provider-IDs
+ */
+function getProviderSafely(config: Config, providerId?: string): { success: boolean; provider?: Provider; error?: string } {
+  const providersList = Array.isArray(config.providers) ? config.providers : []
+  const id = providerId || config.activeProvider
+  const provider = providersList.find(p => p.id === id)
+
+  if (!provider) {
+    return {
+      success: false,
+      error: `Provider not found: ${id}. Available: ${providersList.map(p => p.id).join(', ')}`,
+    }
+  }
+
+  return { success: true, provider }
+}
 
 // Command history (in-memory for session)
 let commandHistory: string[] = []
@@ -14,8 +36,21 @@ const userAliases = new Map<string, string>()
 import * as gitProvider from './providers/git'
 import { executeCommand } from './providers/shell'
 import { executeFile, executeCode } from './providers/execute'
+import { networkCommands } from './commands/network'
+import { systemCommands } from './commands/system'
+import { fileCommands } from './commands/files'
+import { gitAdvancedCommands } from './commands/git-advanced'
+import { termuxCommands } from './commands/termux'
+import { reviewEnhancedCommands } from './commands/review-enhanced'
+import { pluginCommands } from './commands/plugin'
+import { themeCommands } from './commands/theme'
 
-// ─── Helper: Read File ───────────────────────────────────────────
+/**
+ * Liest den Inhalt einer Datei vom Dateisystem und gibt ihn als Text zurück.
+ *
+ * @param path - Pfad zur Datei, die gelesen werden soll
+ * @returns Den UTF‑8-dekodierten Inhalt der Datei oder eine Fehlermeldung im Format `Error: Could not read file <path> - <message>`
+ */
 async function readFileContent(path: string): Promise<string> {
   try {
     return await readFile(path, 'utf-8')
@@ -65,7 +100,12 @@ async function getFileInfo(path: string): Promise<string> {
   }
 }
 
-// ─── Helper: Detect Language ─────────────────────────────────────
+/**
+ * Ermittelt anhand der Dateiendung die passende Programmiersprache oder den Dateityp.
+ *
+ * @param filename - Dateiname oder Pfad zur Datei
+ * @returns Den erkannten Sprach-/Dateityp (z. B. `typescript`, `python`, `javascript`); `'text'` wenn die Endung unbekannt ist
+ */
 function detectLanguage(filename: string): string {
   const ext = extname(filename).toLowerCase()
   const langMap: Record<string, string> = {
@@ -96,7 +136,7 @@ function detectLanguage(filename: string): string {
 }
 
 // ─── Commands ────────────────────────────────────────────────────
-export const commands: Command[] = [
+export const builtinCommands: Command[] = [
   // /review - Code review
   {
     name: 'review',
@@ -108,22 +148,28 @@ export const commands: Command[] = [
       const content = await readFileContent(filePath)
       const language = detectLanguage(filePath)
 
-      const userParts: MessagePart[] = [{
-        type: 'file',
-        filename: filePath,
-        content,
-        language,
-      }]
+       const userParts: MessagePart[] = [{
+         type: 'file',
+         filename: filePath,
+         content,
+         language,
+       }]
 
-      return sendToAI([{
-        id: Date.now().toString(),
-        role: 'user',
-        parts: [
-          ...userParts,
-          { type: 'text', text: `Please review this code for bugs, security issues, performance problems, and best practices. File: ${filePath}` },
-        ],
-        timestamp: new Date(),
-      }], context.config.providers.find(p => p.id === context.config.activeProvider)!)
+       const providerResult = getProviderSafely(context.config)
+       if (!providerResult.success) {
+         return [{ type: 'text', text: providerResult.error }]
+       }
+       const { provider } = providerResult
+
+       return sendToAI([{
+         id: Date.now().toString(),
+         role: 'user',
+         parts: [
+           ...userParts,
+           { type: 'text', text: `Please review this code for bugs, security issues, performance problems, and best practices. File: ${filePath}` },
+         ],
+         timestamp: new Date(),
+       }], provider)
     },
   },
 
@@ -134,19 +180,25 @@ export const commands: Command[] = [
     aliases: ['e'],
     args: ['[file]'],
     run: async (args, context) => {
-      const filePath = args.trim() || '.'
-      const content = await readFileContent(filePath)
-      const language = detectLanguage(filePath)
+       const filePath = args.trim() || '.'
+       const content = await readFileContent(filePath)
+       const language = detectLanguage(filePath)
 
-      return sendToAI([{
-        id: Date.now().toString(),
-        role: 'user',
-        parts: [
-          { type: 'file', filename: filePath, content, language },
-          { type: 'text', text: `Please explain how this code works. File: ${filePath}` },
-        ],
-        timestamp: new Date(),
-      }], context.config.providers.find(p => p.id === context.config.activeProvider)!)
+       const providerResult = getProviderSafely(context.config)
+       if (!providerResult.success) {
+         return [{ type: 'text', text: providerResult.error }]
+       }
+       const { provider } = providerResult
+
+       return sendToAI([{
+         id: Date.now().toString(),
+         role: 'user',
+         parts: [
+           { type: 'file', filename: filePath, content, language },
+           { type: 'text', text: `Please explain how this code works. File: ${filePath}` },
+         ],
+         timestamp: new Date(),
+       }], provider)
     },
   },
 
@@ -157,19 +209,25 @@ export const commands: Command[] = [
     aliases: ['f'],
     args: ['[file]'],
     run: async (args, context) => {
-      const filePath = args.trim() || '.'
-      const content = await readFileContent(filePath)
-      const language = detectLanguage(filePath)
+       const filePath = args.trim() || '.'
+       const content = await readFileContent(filePath)
+       const language = detectLanguage(filePath)
 
-      return sendToAI([{
-        id: Date.now().toString(),
-        role: 'user',
-        parts: [
-          { type: 'file', filename: filePath, content, language },
-          { type: 'text', text: `Please fix any issues in this code. Provide the fixes as a diff. File: ${filePath}` },
-        ],
-        timestamp: new Date(),
-      }], context.config.providers.find(p => p.id === context.config.activeProvider)!)
+       const providerResult = getProviderSafely(context.config)
+       if (!providerResult.success) {
+         return [{ type: 'text', text: providerResult.error }]
+       }
+       const { provider } = providerResult
+
+       return sendToAI([{
+         id: Date.now().toString(),
+         role: 'user',
+         parts: [
+           { type: 'file', filename: filePath, content, language },
+           { type: 'text', text: `Please fix any issues in this code. Provide the fixes as a diff. File: ${filePath}` },
+         ],
+         timestamp: new Date(),
+       }], provider)
     },
   },
 
@@ -260,31 +318,29 @@ export const commands: Command[] = [
     },
   },
 
-   // /provider - Switch provider
-   {
-     name: 'provider',
-     description: 'Switch AI provider',
-     aliases: ['model'],
-     args: ['[provider]'],
-     run: async (args, context) => {
-       const providerName = args.trim()
-       if (!providerName) {
-         // Ensure providers is an array
-         const providersList = Array.isArray(context.config.providers) ? context.config.providers : []
-         const providers = providersList.map(p =>
-           `  ${p.id} - ${p.name} (${p.model})`
-         ).join('\n')
-         return [{
-           type: 'text',
-           text: `Available providers:\n${providers}\n\nCurrent: ${context.config.activeProvider}`,
-         }]
-       }
+    // /provider - Switch provider
+    {
+      name: 'provider',
+      description: 'Switch AI provider',
+      aliases: ['model'],
+      args: ['[provider]'],
+      run: async (args, context) => {
+        const providerName = args.trim()
+        const providersList = Array.isArray(context.config.providers) ? context.config.providers : []
 
-       // Ensure providers is an array
-       const providersList = Array.isArray(context.config.providers) ? context.config.providers : []
-       const provider = providersList.find(p =>
-         p.id === providerName || p.name.toLowerCase() === providerName.toLowerCase()
-       )
+        if (!providerName) {
+          const providers = providersList.map(p =>
+            `  ${p.id} - ${p.name} (${p.model})`
+          ).join('\n')
+          return [{
+            type: 'text',
+            text: `Available providers:\n${providers}\n\nCurrent: ${context.config.activeProvider}`,
+          }]
+        }
+
+        const provider = providersList.find(p =>
+          p.id === providerName || p.name.toLowerCase() === providerName.toLowerCase()
+        )
 
         if (!provider) {
           return [{
@@ -298,8 +354,8 @@ export const commands: Command[] = [
           type: 'text',
           text: `Switched to ${provider.name} (${provider.model})`,
         }]
-     },
-   },
+      },
+    },
 
    // /git - Git operations
    {
@@ -452,7 +508,6 @@ export const commands: Command[] = [
       run: async (args, context) => {
         const targetPath = args.trim() || process.env.HOME || process.cwd()
         try {
-          const { isAbsolute } = await import('node:path')
           const resolvedPath = isAbsolute(targetPath)
             ? targetPath
             : join(context.cwd, targetPath)
@@ -717,7 +772,26 @@ export const commands: Command[] = [
     },
   ]
 
-// ─── Command Parser ──────────────────────────────────────────────
+export const commands: Command[] = [
+  ...builtinCommands,
+  ...networkCommands,
+  ...systemCommands,
+  ...fileCommands,
+  ...gitAdvancedCommands,
+  ...termuxCommands,
+  ...reviewEnhancedCommands,
+  ...pluginCommands,
+  ...themeCommands,
+]
+
+/**
+ * Parst eine Benutzereingabe im Kommandoformat (beginnt mit `/`), löst Aliase auf und gibt das gefundene Kommando mit seinen Argumenten zurück.
+ *
+ * Diese Funktion fügt erkannte Kommandos in die `commandHistory` ein und kürzt die Historie auf `MAX_HISTORY`.
+ *
+ * @param input - Die rohe Eingabezeile des Benutzers, erwartet im Format `/command [args...]`
+ * @returns Das Objekt mit `command` und dem verbleibenden `args`-String, oder `null`, wenn die Eingabe kein bekanntes Kommando darstellt
+ */
 export function parseCommand(input: string): { command: Command; args: string } | null {
   if (!input.startsWith('/')) return null
 
@@ -746,7 +820,17 @@ export function parseCommand(input: string): { command: Command; args: string } 
   return { command, args }
 }
 
-// ─── Create Context ──────────────────────────────────────────────
+/**
+ * Erstellt ein CommandContext-Objekt mit Datei-, Dateiliste- und AI‑Hilfsfunktionen für das gegebene Arbeitsverzeichnis und die Konfiguration.
+ *
+ * @param config - Laufzeitkonfiguration, wird zur Auflösung des AI-Providers und für Kontextoperationen verwendet
+ * @param cwd - Aktuelles Arbeitsverzeichnis, das im Kontext als Basis für Pfadoperationen dient
+ * @param deps - Optionale Zusatzhooks:
+ *  - `getMessages`/`setMessages` zum Lesen/Schreiben von Chatnachrichten
+ *  - `getSessionManager` zum Zugriff auf das Sitzungsmanagement
+ *  - `setFileExplorerMode` zum Steuern eines eingebetteten Dateiexplorers
+ * @returns Das erzeugte CommandContext-Objekt. Die enthaltene `sendToAI(parts)`-Funktion sendet die gegebenen Parts als Benutzer-Nachricht an den auf Basis von `config` ermittelten Provider; schlägt die Providerauflösung fehl, wirft `sendToAI` einen Error mit der Fehlernachricht aus `getProviderSafely`.
+ */
 export function createContext(
   config: Config,
   cwd: string,
@@ -757,17 +841,24 @@ export function createContext(
     setFileExplorerMode?: (mode: { active: boolean; cwd?: string; filterExt?: string; searchQuery?: string; onSelect?: (path: string) => void }) => void
   }
 ): CommandContext {
-  return {
-    config,
-    cwd,
-    readFile: readFileContent,
-    listFiles,
-    sendToAI: (parts) => sendToAI([{
-      id: Date.now().toString(),
-      role: 'user',
-      parts,
-      timestamp: new Date(),
-    }], config.providers.find(p => p.id === config.activeProvider)!),
-    ...deps,
-  }
+   return {
+     config,
+     cwd,
+     readFile: readFileContent,
+     listFiles,
+     sendToAI: (parts) => {
+       const providerResult = getProviderSafely(config)
+       if (!providerResult.success) {
+         throw new Error(providerResult.error)
+       }
+       const { provider } = providerResult
+       return sendToAI([{
+         id: Date.now().toString(),
+         role: 'user',
+         parts,
+         timestamp: new Date(),
+       }], provider)
+     },
+     ...deps,
+   }
 }

@@ -5,6 +5,17 @@ import { extname } from 'node:path'
 import { writeFile, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 
+/**
+ * Erzeugt einen eindeutigen temporären Pfad für eine kompiliierte Binärdatei.
+ *
+ * @returns Ein Pfad im `/tmp`-Verzeichnis im Format `/tmp/ai-cli-out-<timestamp>-<random>`.
+ */
+function getTempBinaryPath(): string {
+  const timestamp = Date.now()
+  const random = Math.random().toString(36).substring(2, 11)
+  return `/tmp/ai-cli-out-${timestamp}-${random}`
+}
+
 export interface ExecuteResult {
   success: boolean
   exitCode: number
@@ -54,7 +65,15 @@ export function detectLanguage(filename: string): string {
   return langMap[ext] || 'text'
 }
 
-// ─── Run Command ───────────────────────────────────────────────────
+/**
+ * Führt ein externes Kommando mit Argumenten aus, sammelt stdout/stderr, und liefert das Ausführungsresultat.
+ *
+ * @param command - Pfad oder Name des auszuführenden Programms
+ * @param args - Argumentliste für das Programm
+ * @param timeoutMs - Maximale Ausführungsdauer in Millisekunden bevor der Prozess mit SIGKILL beendet wird
+ * @param stdin - Optionaler Inhalt, der dem Prozess über STDIN geschrieben wird
+ * @returns Das Ausführungsresultat: `success` ist `true` bei Exit-Code `0`, `exitCode` ist der numerische Rückgabewert, `stdout`/`stderr` sind getrimmte Ausgaben, `language` ist leer, `command` ist die ausgeführte Befehlszeile und `timedOut` zeigt an, ob ein Timeout aufgetreten ist.
+ */
 async function runCommand(
   command: string,
   args: string[],
@@ -105,87 +124,95 @@ async function runCommand(
     return data
   }
 
-  const stdoutPromise = subprocess.stdout ? readStream(subprocess.stdout) : Promise.resolve('')
-  const stderrPromise = subprocess.stderr ? readStream(subprocess.stderr) : Promise.resolve('')
+   const stdoutPromise = subprocess.stdout ? readStream(subprocess.stdout) : Promise.resolve('')
+   const stderrPromise = subprocess.stderr ? readStream(subprocess.stderr) : Promise.resolve('')
 
-  // Wait for exit with timeout
-  let exitCode: number
-  try {
-    const [, , exit] = await Promise.race([
-      stdoutPromise.then(s => { stdout = s }),
-      stderrPromise.then(s => { stderr = s }),
-      Promise.race([
-        subprocess.exited,
-        new Promise<never>((_, reject) => {
-          setTimeout(() => {
-            timedOut = true
-            subprocess.kill('SIGKILL')
-            reject(new Error('timeout'))
-          }, timeoutMs)
-        })
-      ])
-    ])
-    exitCode = exit as number
-  } catch (err: any) {
-    await Promise.all([stdoutPromise, stderrPromise])
-    if (err.message === 'timeout') {
-      await new Promise(resolve => setTimeout(resolve, 100))
-      exitCode = -1
-    } else {
-      throw err
-    }
-  }
+   // Create timeout promise
+   const timeoutPromise = new Promise<never>((_, reject) => {
+     setTimeout(() => {
+       timedOut = true
+       subprocess.kill('SIGKILL')
+       reject(new Error('timeout'))
+     }, timeoutMs)
+   })
 
-  if (!stdout) stdout = await stdoutPromise
-  if (!stderr) stderr = await stderrPromise
+   let exitCode: number
+   try {
+     // Wait for both streams and exit (with timeout)
+     const [stdoutResult, stderrResult, exit] = await Promise.all([
+       stdoutPromise,
+       stderrPromise,
+       Promise.race([subprocess.exited, timeoutPromise])
+     ])
+     stdout = stdoutResult
+     stderr = stderrResult
+     exitCode = exit as number
+   } catch (err: any) {
+     // Ensure streams are drained on timeout or other errors
+     await Promise.all([stdoutPromise, stderrPromise])
+     if (err.message === 'timeout') {
+       // Give process a moment to clean up
+       await new Promise(resolve => setTimeout(resolve, 100))
+       exitCode = -1
+     } else {
+       throw err
+     }
+   }
 
-  return {
-    success: exitCode === 0,
-    exitCode,
-    stdout: stdout.trim(),
-    stderr: stderr.trim(),
-    language: '',
-    command: `${command} ${args.join(' ')}`,
-    timedOut,
-  }
+   return {
+     success: exitCode === 0,
+     exitCode,
+     stdout: stdout.trim(),
+     stderr: stderr.trim(),
+     language: '',
+     command: `${command} ${args.join(' ')}`,
+     timedOut,
+   }
 }
 
-// ─── Execute File ──────────────────────────────────────────────────
+/**
+ * Führt die gegebene Quelldatei aus oder kompiliert und führt sie aus, je nach erkannter Programmiersprache.
+ *
+ * @returns Eine formatierte Ergebnisbeschreibung der Ausführung für `filePath`; bei Kompilierungsfehlern wird der String `Compilation failed:\n<stderr>` zurückgegeben; bei nicht unterstützter Sprache wird eine entsprechende Fehlermeldung zurückgegeben.
+ */
 export async function executeFile(filePath: string): Promise<string> {
   const language = detectLanguage(filePath)
 
-  // Handle C (compile then run)
-  if (language === 'c') {
-    const compileResult = await runCommand('gcc', ['-o', '/tmp/ai-cli-out', filePath])
-    if (!compileResult.success) {
-      return `Compilation failed:\n${compileResult.stderr}`
-    }
-    const runResult = await runCommand('/tmp/ai-cli-out', [])
-    await unlink('/tmp/ai-cli-out').catch(() => {})
-    return formatResult(runResult, language, filePath)
-  }
+   // Handle C (compile then run)
+   if (language === 'c') {
+     const binaryPath = getTempBinaryPath()
+     const compileResult = await runCommand('gcc', ['-o', binaryPath, filePath])
+     if (!compileResult.success) {
+       return `Compilation failed:\n${compileResult.stderr}`
+     }
+     const runResult = await runCommand(binaryPath, [])
+     await unlink(binaryPath).catch(() => {})
+     return formatResult(runResult, language, filePath)
+   }
 
-  // Handle C++ (compile then run)
-  if (language === 'cpp') {
-    const compileResult = await runCommand('g++', ['-o', '/tmp/ai-cli-out', filePath])
-    if (!compileResult.success) {
-      return `Compilation failed:\n${compileResult.stderr}`
-    }
-    const runResult = await runCommand('/tmp/ai-cli-out', [])
-    await unlink('/tmp/ai-cli-out').catch(() => {})
-    return formatResult(runResult, language, filePath)
-  }
+   // Handle C++ (compile then run)
+   if (language === 'cpp') {
+     const binaryPath = getTempBinaryPath()
+     const compileResult = await runCommand('g++', ['-o', binaryPath, filePath])
+     if (!compileResult.success) {
+       return `Compilation failed:\n${compileResult.stderr}`
+     }
+     const runResult = await runCommand(binaryPath, [])
+     await unlink(binaryPath).catch(() => {})
+     return formatResult(runResult, language, filePath)
+   }
 
-  // Handle Rust (compile then run with rustc)
-  if (language === 'rust') {
-    const compileResult = await runCommand('rustc', ['-o', '/tmp/ai-cli-out', filePath])
-    if (!compileResult.success) {
-      return `Compilation failed:\n${compileResult.stderr}`
-    }
-    const runResult = await runCommand('/tmp/ai-cli-out', [])
-    await unlink('/tmp/ai-cli-out').catch(() => {})
-    return formatResult(runResult, language, filePath)
-  }
+   // Handle Rust (compile then run with rustc)
+   if (language === 'rust') {
+     const binaryPath = getTempBinaryPath()
+     const compileResult = await runCommand('rustc', ['-o', binaryPath, filePath])
+     if (!compileResult.success) {
+       return `Compilation failed:\n${compileResult.stderr}`
+     }
+     const runResult = await runCommand(binaryPath, [])
+     await unlink(binaryPath).catch(() => {})
+     return formatResult(runResult, language, filePath)
+   }
 
   // Handle Java (compile then run)
   if (language === 'java') {
@@ -210,7 +237,13 @@ export async function executeFile(filePath: string): Promise<string> {
   return formatResult(result, language, filePath)
 }
 
-// ─── Execute Code Snippet ──────────────────────────────────────────
+/**
+  * Führt den übergebenen Quellcode in der angegebenen Sprache aus und gibt einen formatierten Ausführungsbericht zurück.
+  *
+  * @param code - Der auszuführende Quellcode
+  * @param language - Sprachbezeichner; unterstützt: `python`, `javascript`, `typescript`, `go`, `rust`, `ruby`, `bash`, `sh`, `php`, `c`, `cpp`
+  * @returns Einen formatieren Bericht mit Datei-, Ausgabe- und Fehlermeldungen, Exit-Code und dem ausgeführten Befehl oder eine Fehlermeldung, wenn die Sprache nicht unterstützt wird
+  */
 export async function executeCode(code: string, language: string): Promise<string> {
   const tmpFile = `/tmp/ai-cli-exec-${Date.now()}`
 
@@ -234,19 +267,28 @@ export async function executeCode(code: string, language: string): Promise<strin
     return `Error: Unsupported language "${language}"\nSupported: python, javascript, typescript, go, rust, ruby, bash, sh, php, c, cpp`
   }
 
-  const filePath = tmpFile + ext
-  await writeFile(filePath, code, 'utf-8')
+   const filePath = tmpFile + ext
+   await writeFile(filePath, code, 'utf-8')
 
-  try {
-    return await executeFile(filePath)
-  } finally {
-    await unlink(filePath).catch(() => {})
-    // Also clean up compiled binaries
-    await unlink('/tmp/ai-cli-out').catch(() => {})
-  }
-}
+   try {
+     return await executeFile(filePath)
+   } finally {
+     await unlink(filePath).catch(() => {})
+   }
+ }
 
-// ─── Format Result ─────────────────────────────────────────────────
+/**
+ * Erzeugt einen formatierten Bericht über die Ausführung eines Prozesses.
+ *
+ * Der Bericht enthält: Kopfzeile mit Dateipfad und Sprache, Trennlinie, optionalen Timeout-Hinweis,
+ * die zusammengeführten `stdout`- und `stderr`-Blöcke (bei beiden Ausgaben wird vor `stderr` eine Leerzeile eingefügt),
+ * oder `(No output)` falls keine Ausgabe vorliegt, gefolgt von einer abschließenden Trennlinie, dem Exit-Code und dem ausgeführten Befehl.
+ *
+ * @param result - Das Ausführungsergebnis (z. B. `stdout`, `stderr`, `exitCode`, `command`, optional `timedOut`)
+ * @param language - Die angezeigte Programmiersprache für die Kopfzeile
+ * @param filePath - Der angezeigte Pfad oder Name der ausgeführten Datei
+ * @returns Den vollständigen, mehrzeiligen Bericht als String
+ */
 function formatResult(
   result: ExecuteResult,
   language: string,

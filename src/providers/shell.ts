@@ -9,7 +9,20 @@ export interface ShellResult {
   timedOut: boolean
 }
 
-// ─── Run Shell Command ─────────────────────────────────────────────
+/**
+ * Führt einen Prozess aus, sammelt dessen Standardausgabe und -fehler und bricht bei Überschreitung eines Zeitlimits ab.
+ *
+ * @param command - Das auszuführende Kommando oder der Pfad zur ausführbaren Datei
+ * @param args - Optionale Argumentliste für das Kommando
+ * @param timeoutMs - Maximale Ausführungsdauer in Millisekunden bevor der Prozess zwangsbeendet wird
+ * @param useShell - Wenn `true`, wird das Kommando durch die Plattform-Shell (`cmd.exe` auf Windows, `sh` sonst) ausgeführt
+ * @returns Ein Objekt mit Ausführungsinformationen:
+ * - `success`: `true` wenn `exitCode` gleich `0`, sonst `false`
+ * - `exitCode`: Numerischer Exit-Code (`-1` wenn das Kommando durch das Timeout beendet wurde)
+ * - `stdout`: Gesammelte Standardausgabe, als getrimmter String
+ * - `stderr`: Gesammelter Standardfehler, als getrimmter String
+ * - `timedOut`: `true` wenn das Kommando aufgrund des Timeouts beendet wurde, sonst `false`
+ */
 export async function runShell(
   command: string,
   args: string[] = [],
@@ -17,20 +30,18 @@ export async function runShell(
   useShell: boolean = false
 ): Promise<ShellResult> {
   const spawnOptions: any = {
-    cwd: Bun.cwd(),
+    cwd: process.cwd(),
     stdin: 'ignore',
     stdout: 'pipe',
     stderr: 'pipe',
   }
 
-  // Use shell mode for commands with pipes, redirects, etc.
-  if (useShell) {
-    spawnOptions.shell = true
-  }
+  const cmd = useShell
+    ? [process.platform === 'win32' ? 'cmd.exe' : 'sh', '-c', `${command} ${args.join(' ')}`.trim()]
+    : [command, ...args]
 
   const subprocess = Bun.spawn({
-    program: useShell ? (process.platform === 'win32' ? 'cmd.exe' : 'sh') : command,
-    args: useShell ? [useShell ? '/c' : '-c', `${command} ${args.join(' ')}`.trim()] : args,
+    cmd,
     ...spawnOptions,
   })
 
@@ -64,7 +75,8 @@ export async function runShell(
   // Wait for exit with timeout
   let exitCode: number
   try {
-    const [, , exit] = await Promise.race([
+    // Wait for process exit or timeout, while draining streams
+    await Promise.all([
       stdoutPromise.then(s => { stdout = s }),
       stderrPromise.then(s => { stderr = s }),
       Promise.race([
@@ -78,10 +90,10 @@ export async function runShell(
         })
       ])
     ])
-    exitCode = exit as number
+    exitCode = await subprocess.exited
   } catch (err: any) {
     // Ensure streams are drained
-    await Promise.all([stdoutPromise, stderrPromise])
+    await Promise.allSettled([stdoutPromise, stderrPromise])
     if (err.message === 'timeout') {
       await new Promise(resolve => setTimeout(resolve, 100))
       exitCode = -1

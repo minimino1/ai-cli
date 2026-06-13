@@ -24,8 +24,19 @@ async function loadConfig() {
   return defaultConfig
 }
 
+/**
+ * Initialisiert die Anwendung: lädt die Konfiguration, ergänzt fehlende Standardwerte und startet die Ink-UI.
+ *
+ * Lädt die Konfiguration über `loadConfig()`, stellt sicher, dass `providers`, `activeProvider` und `theme`
+ * mit sinnvollen Standardwerten belegt sind (letztlich `defaultConfig` bzw. `'dark'`) und rendert die React Ink-Anwendung.
+ * Setzt `exitOnCtrlC` abhängig davon, ob stdin Raw-Mode unterstützt wird (deaktiviert es, wenn Raw-Mode nicht verfügbar ist).
+ */
 async function main() {
   const config = await loadConfig()
+  // Ensure defaults
+  if (!config.providers) config.providers = defaultConfig.providers
+  if (!config.activeProvider) config.activeProvider = defaultConfig.activeProvider
+  if (!config.theme) config.theme = 'dark'
 
   // Check if stdin supports raw mode
   const isRawModeSupported = process.stdin.isTTY && typeof process.stdin.setRawMode === 'function'

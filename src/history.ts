@@ -137,13 +137,21 @@ export class SessionManager {
 
   async autoSave(messages: Message[]): Promise<void> {
     if (messages.length === 0) return
-    await this.saveSession(messages, 'autosave_latest')
+    try {
+      await this.saveSession(messages, 'autosave_latest')
+    } catch (error) {
+      console.error('[SessionManager] Auto-save failed:', error)
+    }
   }
 
   startAutoSave(messagesGetter: () => Message[], intervalMs: number = 60000): void {
     this.autoSaveInterval = setInterval(async () => {
-      const messages = messagesGetter()
-      await this.autoSave(messages)
+      try {
+        const messages = messagesGetter()
+        await this.autoSave(messages)
+      } catch (error) {
+        console.error('[SessionManager] Auto-save interval error:', error)
+      }
     }, intervalMs)
   }
 
@@ -156,7 +164,11 @@ export class SessionManager {
 
   async saveOnExit(messages: Message[]): Promise<void> {
     if (messages.length > 0) {
-      await this.saveSession(messages, 'last_session')
+      try {
+        await this.saveSession(messages, 'last_session')
+      } catch (error) {
+        console.error('[SessionManager] Save on exit failed:', error)
+      }
     }
   }
 }
