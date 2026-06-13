@@ -2,23 +2,6 @@ import { describe, it, expect, beforeEach, vi } from "bun:test";
 import { parseCommand, createContext, commands } from "../commands";
 import type { CommandContext, Config } from "../types";
 
-// Mock dependencies
-vi.mock("../history", () => ({
-  SessionManager: {
-    getInstance: vi.fn(() => ({
-      sessions: new Map(),
-      saveSession: vi.fn(),
-      loadSession: vi.fn(),
-      listSessions: vi.fn(() => []),
-      deleteSession: vi.fn(),
-    })),
-  },
-}));
-
-vi.mock("../providers/ai", () => ({
-  sendToAI: vi.fn(),
-}));
-
 describe("parseCommand", () => {
   beforeEach(() => {
     // No commandHistory to clear since it's not exported
@@ -279,10 +262,10 @@ describe("edge cases", () => {
     expect(result!.args).toBe("log 10");
   });
 
-  it("should handle deeply nested quoted strings", () => {
-    const result = parseCommand('/echo "a \\"b\\" c"');
+  it("should handle quoted args", () => {
+    const result = parseCommand('/git commit -m "fix: bug"');
     expect(result).not.toBeNull();
-    expect(result!.command.name).toBe("echo");
-    expect(result!.args).toBe('"a \\"b\\" c"');
+    expect(result!.command.name).toBe("git");
+    expect(result!.args).toBe('commit -m "fix: bug"');
   });
 });

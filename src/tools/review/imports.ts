@@ -65,49 +65,58 @@ export async function parseImports(content: string, language: string): Promise<I
       // Match: import { X, Y } from 'path'
       // Match: import * as X from 'path'
       // Match: import 'path' (side-effect only)
-      const importRegex = /import\s+(?:(\*)\s+as\s+(\w+)|(\{[^}]*\})?\s*(?:(\w+)\s+from)?\s*['"]([^'"]+)['"]/g
+      // Match: const X = require('path')
+      // Match: from module import X (Python)
+      const importMatch = line.match(/^(?:import|from\s+\S+\s+import|const\s+\w+\s*=\s*require)\s/)
+      if (!importMatch) continue
 
-      let match
-      while ((match = importRegex.exec(line)) !== null) {
-        const [, isNamespace, namespaceName, namedImportsStr, defaultImport, source] = match
+      // Extract source path using a simple approach
+      const quoteMatch = line.match(/['"]([^'"]+)['"]/)
+      if (!quoteMatch) continue
 
-        const importInfo: ImportInfo = {
-          source,
-          line: i + 1,
-          type: 'unknown',
-          namespaceImport: !!isNamespace,
-        }
+      const source = quoteMatch[1]
+      const isNamespace = /\*\s+as\s+\w+/.test(line)
+      const namedImportsMatch = line.match(/\{([^}]+)\}/)
+      const namedImportsStr = namedImportsMatch ? namedImportsMatch[1] : null
+      const defaultImportMatch = line.match(/import\s+(\w+)\s+from/)
+      const defaultImport = defaultImportMatch ? defaultImportMatch[1] : null
 
-        if (isNamespace) {
-          importInfo.namespaceImport = true
-          importInfo.namedImports = [namespaceName]
-        } else if (namedImportsStr) {
-          // Parse named imports: { A, B as C }
-          const namedImports = namedImportsStr
-            .slice(1, -1)
-            .split(',')
-            .map(imp => imp.trim())
-            .filter(imp => imp)
-          importInfo.namedImports = namedImports
-        }
-
-        if (defaultImport && !namedImportsStr && !isNamespace) {
-          importInfo.defaultImport = defaultImport
-        }
-
-        // Classify import type
-        if (source.startsWith('.')) {
-          importInfo.type = 'relative'
-        } else if (source.startsWith('/') || source.startsWith('http://') || source.startsWith('https://')) {
-          importInfo.type = 'absolute'
-        } else if (source.startsWith('@')) {
-          importInfo.type = 'package' // Scoped package
-        } else if (!source.includes('.') && !source.includes('/')) {
-          importInfo.type = 'builtin' // Node.js built-in or package
-        }
-
-        imports.push(importInfo)
+      const importInfo: ImportInfo = {
+        source,
+        line: i + 1,
+        type: 'unknown',
+        namespaceImport: isNamespace,
       }
+
+      if (isNamespace) {
+        importInfo.namespaceImport = true
+      }
+
+      if (namedImportsStr) {
+        // Parse named imports: { A, B as C }
+        const namedImports = namedImportsStr
+          .split(',')
+          .map(imp => imp.trim())
+          .filter(imp => imp)
+        importInfo.namedImports = namedImports
+      }
+
+      if (defaultImport && !namedImportsStr && !isNamespace) {
+        importInfo.defaultImport = defaultImport
+      }
+
+      // Classify import type
+      if (source.startsWith('.')) {
+        importInfo.type = 'relative'
+      } else if (source.startsWith('/') || source.startsWith('http://') || source.startsWith('https://')) {
+        importInfo.type = 'absolute'
+      } else if (source.startsWith('@')) {
+        importInfo.type = 'package' // Scoped package
+      } else if (!source.includes('.') && !source.includes('/')) {
+        importInfo.type = 'builtin' // Node.js built-in or package
+      }
+
+      imports.push(importInfo)
     }
   } else if (language === 'python') {
     for (let i = 0; i < lines.length; i++) {

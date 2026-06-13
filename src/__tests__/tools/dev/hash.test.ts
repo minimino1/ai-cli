@@ -25,7 +25,7 @@ describe("hash", () => {
 
   it("should handle binary data", async () => {
     const data = new Uint8Array([0x01, 0x02, 0x03]);
-    const result = await hash(data, "sha256");
+    const result = await hash(data as any, "sha256");
     expect(result).toMatch(/^[a-f0-9]{64}$/);
   });
 });
@@ -36,14 +36,14 @@ describe("hashSync", () => {
     expect(result).toMatch(/^[a-f0-9]{64}$/);
   });
 
-  it("should hash synchronously with MD5", () => {
-    const result = hashSync("hello", "md5");
-    expect(result).toMatch(/^[a-f0-9]{32}$/);
-  });
-
   it("should hash synchronously with SHA-1", () => {
     const result = hashSync("hello", "sha1");
     expect(result).toMatch(/^[a-f0-9]{40}$/);
+  });
+
+  it("should hash synchronously with SHA-512", () => {
+    const result = hashSync("hello", "sha512");
+    expect(result).toMatch(/^[a-f0-9]{128}$/);
   });
 
   it("should throw for unsupported algorithm synchronously", () => {

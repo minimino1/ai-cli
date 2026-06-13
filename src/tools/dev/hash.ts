@@ -133,20 +133,21 @@ export function hashSync(str: string, algorithm: string = 'sha256'): string {
   }
 }
 
-// Simplified hash implementations for sync use (not for production crypto)
+// Sync hash implementations using node:crypto
+import { createHash } from 'node:crypto'
+
 function simpleMD5(data: Uint8Array): string {
-  // Placeholder - in production use crypto.subtle
-  return Buffer.from(data).toString('md5')
+  return createHash('md5').update(data).digest('hex')
 }
 
 function simpleSHA1(data: Uint8Array): string {
-  return Buffer.from(data).toString('sha1')
+  return createHash('sha1').update(data).digest('hex')
 }
 
 function simpleSHA256(data: Uint8Array): string {
-  return Buffer.from(data).toString('sha256')
+  return createHash('sha256').update(data).digest('hex')
 }
 
 function simpleSHA512(data: Uint8Array): string {
-  return Buffer.from(data).toString('sha512')
+  return createHash('sha512').update(data).digest('hex')
 }
