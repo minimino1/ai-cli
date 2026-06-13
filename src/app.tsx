@@ -375,8 +375,7 @@ export const App: React.FC<AppProps> = ({ config }) => {
               {isLoading && (
                 <Box paddingLeft={1}>
                   <Text color={theme.info}>Thinking...</Text>
-    <ToastContainer />
-    </Box>
+                </Box>
               )}
             </Box>
 
@@ -473,6 +472,7 @@ export const App: React.FC<AppProps> = ({ config }) => {
           )}
         </Box>
       )}
+      <ToastContainer />
     </Box>
   )
 }
