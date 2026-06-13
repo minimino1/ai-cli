@@ -23,7 +23,15 @@ export interface HTTPResponse {
 }
 
 /**
- * Make an HTTP request
+ * Führt eine HTTP-Anfrage aus und liefert eine normalisierte Antwortstruktur.
+ *
+ * Führt die Anfrage über Bun.fetch aus, misst Dauer und Größe, normalisiert Header und setzt `redirectedURL`, wenn die endgültige URL von der angeforderten abweicht.
+ *
+ * @param method - HTTP-Methode (z. B. `"GET"`, `"POST"`)
+ * @param url - Ziel-URL der Anfrage
+ * @param options - Optionale Anfragekonfiguration; unterstützte Felder: `headers`, `body`, `timeout`, `followRedirects`, `maxRedirects`, `username`, `password`, `compress`
+ * @returns Ein `HTTPResponse`-Objekt mit `status`, `statusText`, normalisierten `headers`, `body`, `time` (ms), `size` (Bytes) und optional `redirectedURL`
+ * @throws Fehler, falls die Anfrage fehlschlägt; die Fehlermeldung enthält die ursprüngliche Nachricht und die verstrichene Zeit in Millisekunden
  */
 export async function request(
   method: string,
@@ -70,42 +78,65 @@ export async function request(
 }
 
 /**
- * GET request
+ * Führt eine HTTP-GET-Anfrage an die angegebene URL aus.
+ *
+ * @param url - Ziel-URL der Anfrage
+ * @param options - Optionale Anfragekonfiguration; vom Typ `HTTPRequestOptions` ohne `body`
+ * @returns Das empfangene `HTTPResponse`-Objekt mit Status, Headern, Body, Dauer (ms) und Größe (Bytes)
  */
 export async function get(url: string, options: Omit<HTTPRequestOptions, 'body'> = {}): Promise<HTTPResponse> {
   return request('GET', url, options)
 }
 
 /**
- * POST request
+ * Führt eine HTTP-POST-Anfrage an die angegebene URL aus.
+ *
+ * @param body - Nutzlast der Anfrage; unterstützt `string`, `FormData`, `URLSearchParams`, `Blob`, `ArrayBuffer` oder typisierte Arrays
+ * @param options - Zusätzliche Anfrageoptionen (z. B. `headers`, `timeout`, `followRedirects`, `maxRedirects`, `username`, `password`, `compress`)
+ * @returns Ein `HTTPResponse`-Objekt mit `status`, `statusText`, normalisierten `headers`, `body`, `time`, `size` und optional `redirectedURL`
  */
 export async function post(url: string, body?: string | FormData | URLSearchParams | Blob | ArrayBuffer | TypedArray, options: Omit<HTTPRequestOptions, 'body'> = {}): Promise<HTTPResponse> {
   return request('POST', url, { ...options, body })
 }
 
 /**
- * PUT request
+ * Führt eine HTTP PUT-Anfrage an die angegebene URL aus.
+ *
+ * @param url - Ziel-URL der Anfrage
+ * @param body - Optionaler Request-Body; akzeptierte Formate sind z. B. String, FormData, URLSearchParams, Blob oder ArrayBuffer
+ * @param options - Zusätzliche Request-Optionen (z. B. Header, Timeout, Redirect-Verhalten, Authentifizierungsdaten, Kompressionssteuerung)
+ * @returns Ein `HTTPResponse`-Objekt mit Status, Statustext, normalisierten Headern, Antwort-Body als Text, Dauer (`time`) und Größe (`size`). 
  */
 export async function put(url: string, body?: string | FormData | URLSearchParams | Blob | ArrayBuffer | TypedArray, options: Omit<HTTPRequestOptions, 'body'> = {}): Promise<HTTPResponse> {
   return request('PUT', url, { ...options, body })
 }
 
 /**
- * DELETE request
+ * Führt eine HTTP DELETE-Anfrage an die angegebene URL aus.
+ *
+ * @param url - Die Ziel-URL der Anfrage
+ * @param options - Optionale Anfragekonfiguration (z. B. Headers, timeout, Redirect-/Auth- und Compress-Optionen). Enthält kein `body`.
+ * @returns Ein normalisiertes `HTTPResponse`-Objekt mit `status`, `statusText`, `headers`, `body`, `time`, `size` und optional `redirectedURL`
  */
 export async function del(url: string, options: Omit<HTTPRequestOptions, 'body'> = {}): Promise<HTTPResponse> {
   return request('DELETE', url, options)
 }
 
 /**
- * PATCH request
+ * Führt eine HTTP-PATCH-Anfrage an die angegebene URL aus.
+ *
+ * @returns Ein `HTTPResponse`-Objekt mit Status, Statustext, normalisierten Headern, Antworttext, Dauer in Millisekunden und Größe in Bytes
  */
 export async function patch(url: string, body?: string | FormData | URLSearchParams | Blob | ArrayBuffer | TypedArray, options: Omit<HTTPRequestOptions, 'body'> = {}): Promise<HTTPResponse> {
   return request('PATCH', url, { ...options, body })
 }
 
 /**
- * HEAD request
+ * Führt eine HTTP HEAD-Anfrage an die angegebene URL aus.
+ *
+ * Die zurückgegebene Antwort enthält Status, Header, Zeit- und Größeninformationen; der `body` ist leer (`''`).
+ *
+ * @returns Das `HTTPResponse`-Objekt mit `body` gleich `''`.
  */
 export async function head(url: string, options: Omit<HTTPRequestOptions, 'body'> = {}): Promise<HTTPResponse> {
   const response = await request('HEAD', url, options)
@@ -114,14 +145,24 @@ export async function head(url: string, options: Omit<HTTPRequestOptions, 'body'
 }
 
 /**
- * OPTIONS request
+ * Führt eine HTTP-OPTIONS-Anfrage an die angegebene URL aus.
+ *
+ * @param url - Die Ziel-URL für die Anfrage
+ * @param options - Optionale Anfragekonfiguration (z. B. `headers`, `timeout`, `followRedirects`)
+ * @returns Ein `HTTPResponse`-Objekt mit Status, Statustext, normalisierten Headern, Body-Text, Dauer in ms und Byte-Größe; `redirectedURL` ist gesetzt, wenn die endgültige URL von der angeforderten abweicht
  */
 export async function options(url: string, options: Omit<HTTPRequestOptions, 'body'> = {}): Promise<HTTPResponse> {
   return request('OPTIONS', url, options)
 }
 
 /**
- * Format response for display
+ * Formatiert ein HTTPResponse-Objekt zu einer mehrzeiligen, menschenlesbaren Darstellung.
+ *
+ * Fügt Statuszeile, Dauer in Millisekunden und formatierte Größe hinzu; wenn vorhanden, wird die endgültige umgeleitete URL angezeigt.
+ *
+ * @param response - Das zu formatierende HTTP-Response-Objekt
+ * @param verbose - Wenn `true`, werden die Antwortheader als separater Abschnitt ausgegeben
+ * @returns Eine mehrzeilige Zeichenkette mit Status, Zeit, Größe und optionalen Abschnitten für Redirect, Headers und Body
  */
 export function formatResponse(response: HTTPResponse, verbose: boolean = false): string {
   const lines: string[] = []
@@ -152,7 +193,10 @@ export function formatResponse(response: HTTPResponse, verbose: boolean = false)
 }
 
 /**
- * Format bytes to human-readable size
+ * Konvertiert eine Anzahl Bytes in eine menschenlesbare Größendarstellung.
+ *
+ * @param bytes - Anzahl Bytes, die formatiert werden sollen
+ * @returns Die formatierte Größe mit geeigneter Einheit (`B`, `KB`, `MB`, `GB`, `TB`). Bei `B` ohne Nachkommastellen, sonst mit zwei Nachkommastellen.
  */
 function formatBytes(bytes: number): string {
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
@@ -168,7 +212,11 @@ function formatBytes(bytes: number): string {
 }
 
 /**
- * Parse URL parameters
+ * Zerlegt eine URL-Zeichenkette in ihre einzelnen Komponenten.
+ *
+ * @param url - Die zu parsende vollständige URL als Zeichenkette.
+ * @returns Ein Objekt mit `protocol`, `host`, `port` (oder `null` wenn nicht gesetzt), `pathname`, `search` und `hash`.
+ * @throws Error - Wenn die Eingabe keine gültige URL ist (Nachricht beginnt mit `Invalid URL:`).
  */
 export function parseURL(url: string): {
   protocol: string
@@ -194,7 +242,11 @@ export function parseURL(url: string): {
 }
 
 /**
- * Build URL with query parameters
+ * Fügt die gegebenen Query-Parameter an eine Basis‑URL an.
+ *
+ * @param base - Die Basis‑URL
+ * @param params - Schlüssel‑Wert‑Paare für Query‑Parameter; Einträge mit `undefined` werden ausgelassen
+ * @returns Die vollständige URL als String mit den gesetzten Query‑Parametern
  */
 export function buildURL(base: string, params: Record<string, string | number | boolean | undefined>): string {
   const url = new URL(base)
@@ -207,7 +259,10 @@ export function buildURL(base: string, params: Record<string, string | number | 
 }
 
 /**
- * Test if URL is reachable (HEAD request)
+ * Prüft, ob eine URL per HEAD-Anfrage erreichbar ist.
+ *
+ * @param timeout - Maximale Wartezeit in Millisekunden für die Anfrage (Standard: 5000)
+ * @returns `reachable: true` wenn der Server mit einem Statuscode im Bereich 200–399 antwortet; `status` enthält den HTTP-Statuscode (falls vorhanden); `error` enthält die Fehlermeldung bei einem Fehler
  */
 export async function testURL(url: string, timeout: number = 5000): Promise<{ reachable: boolean; status?: number; error?: string }> {
   try {

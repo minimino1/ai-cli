@@ -29,7 +29,15 @@ export interface DateRange {
 }
 
 /**
- * Convert glob pattern to RegExp
+ * Erzeugt ein RegExp, das einem Glob-Pattern entspricht.
+ *
+ * Unterstützt `*` als beliebige Zeichenfolge und `?` als genau ein Zeichen; das
+ * resultierende RegExp ist so verankert, dass es den gesamten zu testenden
+ * String abgleicht.
+ *
+ * @param pattern - Glob-Pattern, z. B. `src/**/*.ts` oder `file?.txt`
+ * @param ignoreCase - Wenn `true`, wird das Muster ohne Berücksichtigung der Groß-/Kleinschreibung verglichen
+ * @returns Ein RegExp, das das angegebene Glob-Pattern gegen komplette Strings prüft
  */
 function globToRegex(pattern: string, ignoreCase: boolean = false): RegExp {
   // Escape special regex characters except * and ?
@@ -43,7 +51,14 @@ function globToRegex(pattern: string, ignoreCase: boolean = false): RegExp {
 }
 
 /**
- * Check if file matches glob pattern
+ * Bestimmt, ob ein Pfad mit einem Glob-Muster übereinstimmt.
+ *
+ * Das Muster unterstützt `*` (beliebige Zeichenfolge) und `?` (ein einzelnes Zeichen) und wird so in einen regulären Ausdruck umgewandelt, dass das gesamte `filePath` abgeglichen wird. Bei `ignoreCase = true` erfolgt der Vergleich ohne Berücksichtigung der Groß-/Kleinschreibung.
+ *
+ * @param filePath - Der zu prüfende Pfad
+ * @param pattern - Das Glob-Muster
+ * @param ignoreCase - Wenn `true`, wird die Groß-/Kleinschreibung ignoriert
+ * @returns `true`, wenn `filePath` dem Muster entspricht, `false` sonst
  */
 function matchesGlob(filePath: string, pattern: string, ignoreCase: boolean = false): boolean {
   const regex = globToRegex(pattern, ignoreCase)
@@ -51,7 +66,14 @@ function matchesGlob(filePath: string, pattern: string, ignoreCase: boolean = fa
 }
 
 /**
- * Search files by glob pattern
+ * Durchsucht ein Verzeichnis nach Dateien und Unterverzeichnissen, deren Pfad oder Name einem Glob-Muster entspricht.
+ *
+ * Durchsucht Einträge ab `path` und liefert für jede Übereinstimmung ein `SearchResult` mit Pfad und Metadaten.
+ *
+ * @param path - Stammverzeichnis, in dem die Suche gestartet wird (relativ oder absolut)
+ * @param pattern - Glob-Muster, das gegen den Pfad relativ zum Suchstamm und gegen den Eintragsnamen geprüft wird
+ * @param options - Zusätzliche Suchoptionen; unterstützt `recursive` (standard: true), `ignoreCase` (standard: false) und `maxResults` (standard: 1000)
+ * @returns Eine Liste von `SearchResult`-Objekten; jedes Ergebnis enthält mindestens `path` und `type` (`'file' | 'directory'`) und kann optional `size` und `modified` enthalten
  */
 export async function searchFiles(
   path: string,
@@ -109,7 +131,16 @@ export async function searchFiles(
 }
 
 /**
- * Search file contents (grep-like)
+ * Durchsucht Dateien unter einem Verzeichnis nach Zeilen, die das angegebene reguläre Ausdrucks‑Pattern matchen.
+ *
+ * Unterstützt rekursive Suche (standardmäßig), optionale Filterung von Dateinamen per Glob und begrenzt die Anzahl der Ergebnisse über `maxResults`. Verzeichnisse und Dateien, deren Name mit `.` beginnt, sowie nicht lesbare Dateien/Verzeichnisse werden übersprungen.
+ *
+ * @param path - Wurzelverzeichnis, in dem gesucht wird
+ * @param pattern - Regulärer Ausdruck als String, der gegen jede Zeile der durchsuchten Dateien getestet wird; das `ignoreCase`-Flag in `options` beeinflusst die Groß-/Kleinschreibung
+ * @param options - Zusätzliche Suchoptionen; unterstützt Felder aus `SearchOptions` sowie:
+ *   - `filePattern` — optionaler Glob (z. B. `*.ts`, `*.js`) zur Filterung der zu lesenden Dateinamen
+ *   - `showContext` — Anzahl Kontextzeilen vor und nach der Trefferzeile (wird aktuell akzeptiert, aber nicht in den Ergebnissen zurückgegeben)
+ * @returns Eine Liste von `SearchResult`-Objekten; Treffer enthalten `path`, `type: 'file'`, `match` (die getrimmte Trefferzeile) und `lineNumber`
  */
 export async function grepFiles(
   path: string,
@@ -189,7 +220,14 @@ export async function grepFiles(
 }
 
 /**
- * Search files by size range
+ * Sucht Dateien innerhalb eines gegebenen Größenbereichs unterhalb eines Startverzeichnisses.
+ *
+ * Diese Funktion traversiert rekursiv (standard) das angegebene Verzeichnis, überspringt Einträge mit führendem Punkt, ignoriert Lesefehler und stoppt, sobald `maxResults` erreicht ist.
+ *
+ * @param path - Startverzeichnis für die Suche
+ * @param sizeRange - Objekt mit optionalen Grenzen in Bytes: `min` (>=) und `max` (<=)
+ * @param options - Zusätzliche Optionen; `recursive` (default `true`) steuert das Absteigen in Unterverzeichnisse, `maxResults` (default `1000`) begrenzt die Anzahl zurückgegebener Treffer
+ * @returns Eine Liste von `SearchResult`-Einträgen für jede gefundene Datei, jeweils mit `path`, `size`, `modified` und `type: 'file'`
  */
 export async function searchBySize(
   path: string,
@@ -249,7 +287,15 @@ export async function searchBySize(
 }
 
 /**
- * Search files by date range
+ * Findet Dateien, deren Änderungszeit (mtime) innerhalb des angegebenen Datumsbereichs liegt.
+ *
+ * Durchsucht das Verzeichnis (standardmäßig rekursiv) und sammelt Dateitreffer bis zur Grenze von `options.maxResults`.
+ * Versteckte Einträge (Namen, die mit `.` beginnen) sowie nicht lesbare Dateien/Verzeichnisse werden übersprungen.
+ *
+ * @param path - Startverzeichnis (absolut oder relativ)
+ * @param dateRange - Bereich für die Modifikationszeit; `after` grenzt die untere, `before` die obere Grenze ein
+ * @param options - Suchoptionen; relevante Felder: `recursive` (standard `true`) und `maxResults` (standard `1000`)
+ * @returns Eine Liste von `SearchResult`-Einträgen für gefundene Dateien. Jedes Ergebnis enthält mindestens `path`, `type: 'file'`, `size` und `modified`
  */
 export async function searchByDate(
   path: string,
@@ -309,7 +355,11 @@ export async function searchByDate(
 }
 
 /**
- * Search files by type/extension
+ * Findet Dateien mit den angegebenen Erweiterungen unterhalb des gegebenen Verzeichnisses.
+ *
+ * @param type - Komma-getrennte Liste von Dateiendungen (z. B. `js,ts` oder `.md,.txt`). Ein führender Punkt wird ignoriert. Verwende `all`, um alle Dateien zu matchen.
+ * @param options - Suchoptionen; gängige Felder: `recursive` (default: `true`) zur Rekursion in Unterverzeichnisse und `maxResults` (default: `1000`) zur Begrenzung der zurückgegebenen Ergebnisse.
+ * @returns Gefundene Treffer als Array von `SearchResult`-Objekten; jedes Ergebnis repräsentiert eine Datei (`type: 'file'`) und enthält mindestens `path`, `size` und `modified`, sofern verfügbar.
  */
 export async function searchByType(
   path: string,
@@ -367,7 +417,10 @@ export async function searchByType(
 }
 
 /**
- * Format search results for display
+ * Formatiert eine Liste von Suchergebnissen zu einer menschenlesbaren, ANSI-farbigen Zeichenkette.
+ *
+ * @param results - Die zu formatierenden Suchergebnisse
+ * @returns Eine formatierte Zeichenkette, die eine Kopfzeile mit der Anzahl der Treffer und für jedes Ergebnis eine Zeile mit Typ-Icon, Pfad sowie optionaler Größe und Änderungszeit enthält; bei Inhalts-Treffer werden zusätzlich die gefundene Zeile und gegebenenfalls die Zeilennummer angezeigt.
  */
 export function formatSearchResults(results: SearchResult[]): string {
   if (results.length === 0) {
@@ -399,6 +452,12 @@ export function formatSearchResults(results: SearchResult[]): string {
   return lines.join('\n')
 }
 
+/**
+ * Formatiert eine Bytezahl in eine kompakte, menschlich lesbare Einheit.
+ *
+ * @param bytes - Die Größe in Bytes (erwartet >= 0)
+ * @returns Die formatierte Größe als String mit einer Nachkommastelle und einer Einheit (`B`, `KB`, `MB`, `GB`)
+ */
 function formatSize(bytes: number): string {
   if (bytes === 0) return '0 B'
   const k = 1024
@@ -407,15 +466,34 @@ function formatSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
+/**
+ * Formatiert ein Datum als lokale Datums- und Uhrzeitdarstellung (Stunden und Minuten).
+ *
+ * @param date - Das zu formatierende Datum
+ * @returns Die lokalisierte Datumskomponente gefolgt von der Uhrzeit im `HH:MM`-Format
+ */
 function formatDate(date: Date): string {
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
+/**
+ * Löst eine Pfadangabe relativ zum aktuellen Arbeitsverzeichnis auf.
+ *
+ * @param path - Eine Pfadangabe; darf absolut (beginnt mit `/`) oder relativ sein
+ * @returns Den resultierenden Pfad; bei einem absoluten Eingabepfad (`/...`) identisch zur Eingabe, sonst mit `process.cwd()` kombiniert
+ */
 function resolvePath(path: string): string {
   if (path.startsWith('/')) return path
   return join(process.cwd(), path)
 }
 
+/**
+ * Berechnet den relativen Pfad, der von `from` zum Ziel `to` führt.
+ *
+ * @param from - Ausgangspfad
+ * @param to - Zielpfad
+ * @returns Den relativen Pfad von `from` zu `to`. Gibt `'.'` zurück, wenn beide Pfade gleich sind oder das Ergebnis leer wäre.
+ */
 function relative(from: string, to: string): string {
   // Simple relative path calculation
   const fromParts = from.split('/').filter(p => p)
@@ -437,7 +515,12 @@ function relative(from: string, to: string): string {
 import { readdirSync, statSync } from 'fs'
 
 /**
- * Sync version of searchFiles
+ * Durchsucht ein Verzeichnisbaum nach Einträgen, deren Pfad oder Name einem Glob-Muster entspricht.
+ *
+ * @param path - Wurzelverzeichnis der Suche; relative Pfade werden gegen das aktuelle Arbeitsverzeichnis aufgelöst
+ * @param pattern - Glob-Muster (unterstützt `*` und `?`) das gegen den relativen Pfad und den Eintragsnamen getestet wird
+ * @param options - Suchoptionen; unterstützte Felder: `recursive` (standard: `true`), `ignoreCase` (standard: `false`), `maxResults` (standard: `1000`)
+ * @returns Eine Array von `SearchResult`-Objekten für jede gefundene Übereinstimmung; jedes Ergebnis enthält den Pfad relativ zur Suchwurzel, den Eintragstyp und ggf. Metadaten wie Größe und Änderungszeit
  */
 export function searchFilesSync(path: string, pattern: string, options: SearchOptions = {}): SearchResult[] {
   const results: SearchResult[] = []

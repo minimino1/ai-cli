@@ -26,7 +26,13 @@ const __dirname = dirname(__filename)
 // Plugin directory
 const pluginsDir = `${process.env.HOME || process.env.USERPROFILE || ''}/.config/ai-cli/plugins`
 
-// ─── Helper: Download from URL ─────────────────────────────────────────
+/**
+ * Lädt eine Datei von einer HTTP- oder HTTPS-URL herunter und speichert sie unter dem angegebenen Pfad.
+ *
+ * @param url - Die HTTP(S)-URL der herunterzuladenden Ressource
+ * @param destPath - Zieldateipfad, in den der Inhalt geschrieben wird (bestehende Datei wird überschrieben)
+ * @throws Error - Wenn der HTTP-Statuscode nicht im Bereich 200–299 liegt oder beim Netzwerk-/Datei-IO-Vorgang ein Fehler auftritt
+ */
 async function downloadFromUrl(url: string, destPath: string): Promise<void> {
   const https = await import('node:https')
   const http = await import('node:http')
@@ -46,7 +52,14 @@ async function downloadFromUrl(url: string, destPath: string): Promise<void> {
   await streamPipeline(response, await import('node:fs').then(fs => fs.createWriteStream(destPath)))
 }
 
-// ─── Helper: Clone Git Repository ──────────────────────────────────────
+/**
+ * Klont ein Git-Repository von der angegebenen URL in das angegebene Zielverzeichnis.
+ *
+ * @param url - Die Repository-URL (z. B. `https://...` oder `git@...`)
+ * @param destPath - Zielverzeichnis oder -pfad, in das/den das Repository geklont wird
+ * @returns `void` wenn der Klonvorgang erfolgreich ist
+ * @throws Error Wenn der Klonvorgang fehlschlägt; die Fehlermeldung enthält gegebenenfalls die Ausgabe des Klonbefehls
+ */
 async function cloneGitRepo(url: string, destPath: string): Promise<void> {
   const { exec } = await import('node:child_process')
 
@@ -295,14 +308,24 @@ export const pluginCommands: Command[] = [
   },
 ]
 
-// ─── Register Plugin Commands ─────────────────────────────────────────
+/**
+ * Registriert die pluginbezogenen CLI-Befehle beim Hauptkommandomodul.
+ *
+ * Wird von der zentralen Befehlsregistrierung aufgerufen und fügt die in
+ * pluginCommands definierten Befehle zur globalen Befehlsliste hinzu.
+ */
 export function registerPluginCommands(): void {
   // This will be called from main commands.ts
   // We'll add pluginCommands to the main commands array
   console.log('[PluginCommands] Plugin commands registered')
 }
 
-// ─── Initialize Plugin System ─────────────────────────────────────────
+/**
+ * Initialisiert das Plugin-Subsystem und lädt aktivierte Plugins.
+ *
+ * Startet das Beobachten des Plugin-Verzeichnisses, lädt alle aktivierten Plugins und protokolliert den Erfolg.
+ * Bei Fehlern werden diese gefangen und als Fehler geloggt; Ausnahmen werden nicht weitergeworfen.
+ */
 export async function initializePluginSystem(): Promise<void> {
   try {
     // Start watching plugins directory
@@ -317,7 +340,11 @@ export async function initializePluginSystem(): Promise<void> {
   }
 }
 
-// ─── Cleanup Plugin System ────────────────────────────────────────────
+/**
+ * Führt die Aufräumarbeiten des Plugin-Subsystems aus.
+ *
+ * Beendet laufende Plugin-Aktivitäten, gibt zugehörige Ressourcen frei und stoppt ggf. Datei- bzw. Verzeichnisüberwachungen.
+ */
 export function cleanupPluginSystem(): void {
   cleanupPlugins()
 }

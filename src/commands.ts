@@ -4,7 +4,13 @@ import type { Command, CommandContext, MessagePart, Config, Message, Session, Pr
 import { sendToAI } from './providers/ai'
 import { SessionManager } from './history'
 
-// Helper to safely get provider from config
+/**
+ * Wählt anhand der übergebenen Konfiguration einen Provider aus und prüft, ob er vorhanden ist.
+ *
+ * @param config - Konfiguration, die `providers` (optional) und `activeProvider` enthalten kann
+ * @param providerId - Optionaler Provider-Id-Override; falls nicht gesetzt wird `config.activeProvider` verwendet
+ * @returns `{ success: true, provider }` wenn ein passender Provider gefunden wurde; `{ success: false, error }` sonst — die Fehlermeldung enthält die angefragte Id und die Liste verfügbarer Provider-IDs
+ */
 function getProviderSafely(config: Config, providerId?: string): { success: boolean; provider?: Provider; error?: string } {
   const providersList = Array.isArray(config.providers) ? config.providers : []
   const id = providerId || config.activeProvider
@@ -39,7 +45,12 @@ import { reviewEnhancedCommands } from './commands/review-enhanced'
 import { pluginCommands } from './commands/plugin'
 import { themeCommands } from './commands/theme'
 
-// ─── Helper: Read File ───────────────────────────────────────────
+/**
+ * Liest den Inhalt einer Datei vom Dateisystem und gibt ihn als Text zurück.
+ *
+ * @param path - Pfad zur Datei, die gelesen werden soll
+ * @returns Den UTF‑8-dekodierten Inhalt der Datei oder eine Fehlermeldung im Format `Error: Could not read file <path> - <message>`
+ */
 async function readFileContent(path: string): Promise<string> {
   try {
     return await readFile(path, 'utf-8')
@@ -89,7 +100,12 @@ async function getFileInfo(path: string): Promise<string> {
   }
 }
 
-// ─── Helper: Detect Language ─────────────────────────────────────
+/**
+ * Ermittelt anhand der Dateiendung die passende Programmiersprache oder den Dateityp.
+ *
+ * @param filename - Dateiname oder Pfad zur Datei
+ * @returns Den erkannten Sprach-/Dateityp (z. B. `typescript`, `python`, `javascript`); `'text'` wenn die Endung unbekannt ist
+ */
 function detectLanguage(filename: string): string {
   const ext = extname(filename).toLowerCase()
   const langMap: Record<string, string> = {
@@ -768,7 +784,14 @@ export const commands: Command[] = [
   ...themeCommands,
 ]
 
-// ─── Command Parser ──────────────────────────────────────────────
+/**
+ * Parst eine Benutzereingabe im Kommandoformat (beginnt mit `/`), löst Aliase auf und gibt das gefundene Kommando mit seinen Argumenten zurück.
+ *
+ * Diese Funktion fügt erkannte Kommandos in die `commandHistory` ein und kürzt die Historie auf `MAX_HISTORY`.
+ *
+ * @param input - Die rohe Eingabezeile des Benutzers, erwartet im Format `/command [args...]`
+ * @returns Das Objekt mit `command` und dem verbleibenden `args`-String, oder `null`, wenn die Eingabe kein bekanntes Kommando darstellt
+ */
 export function parseCommand(input: string): { command: Command; args: string } | null {
   if (!input.startsWith('/')) return null
 
@@ -797,7 +820,17 @@ export function parseCommand(input: string): { command: Command; args: string } 
   return { command, args }
 }
 
-// ─── Create Context ──────────────────────────────────────────────
+/**
+ * Erstellt ein CommandContext-Objekt mit Datei-, Dateiliste- und AI‑Hilfsfunktionen für das gegebene Arbeitsverzeichnis und die Konfiguration.
+ *
+ * @param config - Laufzeitkonfiguration, wird zur Auflösung des AI-Providers und für Kontextoperationen verwendet
+ * @param cwd - Aktuelles Arbeitsverzeichnis, das im Kontext als Basis für Pfadoperationen dient
+ * @param deps - Optionale Zusatzhooks:
+ *  - `getMessages`/`setMessages` zum Lesen/Schreiben von Chatnachrichten
+ *  - `getSessionManager` zum Zugriff auf das Sitzungsmanagement
+ *  - `setFileExplorerMode` zum Steuern eines eingebetteten Dateiexplorers
+ * @returns Das erzeugte CommandContext-Objekt. Die enthaltene `sendToAI(parts)`-Funktion sendet die gegebenen Parts als Benutzer-Nachricht an den auf Basis von `config` ermittelten Provider; schlägt die Providerauflösung fehl, wirft `sendToAI` einen Error mit der Fehlernachricht aus `getProviderSafely`.
+ */
 export function createContext(
   config: Config,
   cwd: string,

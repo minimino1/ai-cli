@@ -30,7 +30,12 @@ export interface PromptResult<T = any> {
 }
 
 /**
- * Confirm prompt (yes/no)
+ * Rendert eine Ja/Nein-Bestätigungsabfrage und verarbeitet Tastatureingaben zur Auswahl und Bestätigung.
+ *
+ * @param message - Die angezeigte Prompt-Nachricht
+ * @param defaultValue - Anfangsauswahl; `true` setzt "Yes", `false` setzt "No" (Standard: `false`)
+ * @param onConfirm - Wird bei Bestätigung (Enter) mit `true` für "Yes" oder `false` für "No" aufgerufen
+ * @param onCancel - Wird bei Abbruch (Escape) aufgerufen
  */
 export function ConfirmPrompt({
   message,
@@ -70,7 +75,17 @@ export function ConfirmPrompt({
 }
 
 /**
- * Text input prompt
+ * Rendert ein einzeiliges Texteingabe-Prompt mit optionaler Validierung, Platzhalter und blinkendem Cursor.
+ *
+ * @param message - Der Text, der über dem Eingabefeld angezeigt wird
+ * @param defaultValue - Anfangswert der Eingabe
+ * @param validate - Validierungsfunktion, die `true` für gültige Werte oder einen Fehlerstring/`false` für ungültige Werte zurückgibt
+ * @param errorMessage - Fallback-Fehlermeldung, wenn `validate` kein String liefert
+ * @param placeholder - Platzhaltertext, der angezeigt wird, wenn die Eingabe leer ist
+ * @param trim - Ob die Eingabe beim Absenden automatisch getrimmt werden soll
+ * @param onSubmit - Callback mit dem finalen (gegebenenfalls getrimmten) Wert bei Bestätigung
+ * @param onCancel - Callback, wenn der Nutzer das Prompt abbricht (z. B. Escape)
+ * @returns Das gerenderte InputPrompt-Element
  */
 export function InputPrompt<T extends string = string>({
   message,
@@ -146,7 +161,11 @@ export function InputPrompt<T extends string = string>({
 }
 
 /**
- * Password input prompt (hidden)
+ * Rendert eine Passwort-Eingabe, die eingegebene Zeichen maskiert und einen blinkenden Cursor anzeigt.
+ *
+ * @param message - Die anzuzeigende Aufforderungstextzeile
+ * @param onSubmit - Wird aufgerufen, wenn Enter gedrückt wird; erhält das eingegebene Passwort
+ * @param onCancel - Wird aufgerufen, wenn Escape gedrückt wird, um die Eingabe abzubrechen
  */
 export function PasswordPrompt({
   message,
@@ -189,7 +208,17 @@ export function PasswordPrompt({
 }
 
 /**
- * Single select prompt
+ * Rendert eine einzelne Auswahlaufforderung, mit der Nutzer per Pfeiltasten eine Option auswählen können.
+ *
+ * Zeigt die übergebene Nachricht und eine durch `choices` bestimmte Liste an; die fokussierte Option wird hervorgehoben.
+ *
+ * @param message - Die angezeigte Aufforderungstextzeile
+ * @param choices - Array verfügbarer Auswahloptionen
+ * @param getLabel - Funktion zur Erzeugung des Anzeigetextes für eine Wahl (Standard: String)
+ * @param getValue - Funktion zur Erzeugung eines eindeutigen Schlüssels für eine Wahl (Standard: String)
+ * @param defaultValue - Optional vorausgewählte Wahl; falls gesetzt wird der Fokus darauf initialisiert
+ * @param onSubmit - Wird mit der gewählten Option aufgerufen, wenn Enter gedrückt wird
+ * @param onCancel - Wird aufgerufen, wenn Escape gedrückt wird
  */
 export function SelectPrompt<T>({
   message,
@@ -250,7 +279,17 @@ export function SelectPrompt<T>({
 }
 
 /**
- * Multi-select prompt
+ * Rendert ein interaktives Mehrfachauswahl-Prompt mit Tastatursteuerung.
+ *
+ * Unterstützt Navigation mit Pfeiltasten, Umschalten einzelner Optionen (Leertaste / `a`),
+ * Bestätigung mit Enter und Abbrechen mit Esc. Zeigt außerdem die Anzahl ausgewählter Optionen.
+ *
+ * @param getLabel - Wandelt eine Choice in das anzuzeigende Label um (Standard: String(choice))
+ * @param getValue - Liefert einen stabilen Schlüssel für eine Choice als String (Standard: String(choice))
+ * @param defaultValue - Anfangs ausgewählte Choices
+ * @param onSubmit - Wird mit dem Array der ausgewählten Choices aufgerufen, wenn der Nutzer bestätigt
+ * @param onCancel - Wird aufgerufen, wenn der Nutzer das Prompt abbricht
+ * @returns Das gerenderte Prompt-Element
  */
 export function MultiSelectPrompt<T>({
   message,
@@ -333,7 +372,18 @@ export function MultiSelectPrompt<T>({
 }
 
 /**
- * Editor prompt (multi-line)
+ * Zeigt einen mehrzeiligen Texteingabe-Editor an und verwaltet Cursor-, Einfüge- und Löschoperationen.
+ *
+ * Der Editor unterstützt Zeilenumbruch (Shift+Enter), Einfügen von Zeichen, Rückschritt/Delete,
+ * Zeilenverschmelzung/-aufteilung sowie Navigation mit den Pfeiltasten. Enter (ohne Shift) löst
+ * die Übergabe des aktuellen Texts an `onSubmit` aus; Esc ruft `onCancel` auf.
+ *
+ * @param message - Die Anzeigeaufforderung oberhalb des Editors
+ * @param defaultValue - Anfangstext, wird in Zeilen aufgeteilt (`\n` als Trenner)
+ * @param onSubmit - Callback mit dem aktuellen Text (`lines.join('\n')`) bei Bestätigung
+ * @param onCancel - Callback bei Abbruch (z. B. durch Esc)
+ * @param placeholder - Platzhaltertext (optional; wird angezeigt, wenn kein Inhalt vorhanden ist)
+ * @returns Das gerenderte Editor-Prompt-Element
  */
 export function EditorPrompt({
   message,
@@ -470,7 +520,11 @@ export function EditorPrompt({
 }
 
 /**
- * Generic prompt function
+ * Öffnet einen CLI-Prompt des angegebenen Typs und liefert das Ergebnis des Nutzereingriffs.
+ *
+ * @param type - Der Typ des anzuzeigenden Prompts (`'confirm' | 'input' | 'select' | 'multiselect' | 'password' | 'editor'`)
+ * @param options - Konfiguration und Verhalten des Prompts (Nachricht, Standardwerte, Auswahlmöglichkeiten, Validierung usw.)
+ * @returns Ein PromptResult mit den Feldern `cancelled` und optional `value`. Aktuelle Implementierung ist ein Platzhalter und liefert immer `{ cancelled: true }`.
  */
 export async function prompt<T>(
   type: PromptType,

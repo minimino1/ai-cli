@@ -9,7 +9,12 @@ import * as reviewRelated from '../tools/review/related'
 import { sendToAI } from '../providers/ai'
 import type { Command, CommandContext, MessagePart } from '../types'
 
-// ─── Helper: Read File ────────────────────────────────────────────────
+/**
+ * Liest den Inhalt einer Datei und gibt den Text oder eine formatierte Fehlermeldung zurück.
+ *
+ * @param path - Pfad zur Datei
+ * @returns Den UTF‑8-kodierten Dateiinhalt; bei Fehlern eine Zeichenkette beginnend mit `Error: Could not read file ${path} - ...`
+ */
 async function readFileContent(path: string): Promise<string> {
   try {
     return await readFile(path, 'utf-8')
@@ -18,7 +23,12 @@ async function readFileContent(path: string): Promise<string> {
   }
 }
 
-// ─── Helper: Detect Language ───────────────────────────────────────────
+/**
+ * Ermittelt die Programmiersprache anhand der Dateierweiterung.
+ *
+ * @param filename - Pfad oder Dateiname; die Entscheidung basiert auf der Dateiendung
+ * @returns Die erkannte Sprache (z. B. `typescript`, `python`, `javascript`) oder `'text'`, wenn die Erweiterung nicht zugeordnet ist
+ */
 function detectLanguage(filename: string): string {
   const ext = filename.split('.').pop()?.toLowerCase() || ''
   const langMap: Record<string, string> = {

@@ -16,7 +16,11 @@ export interface TermuxStatus {
   shellProfile?: string
 }
 
-// ─── Detect Termux ─────────────────────────────────────────────────────
+/**
+ * Ermittelt, ob die aktuelle Laufzeitumgebung Termux ist und sammelt dazu relevante Status- und Konfigurationsinformationen.
+ *
+ * @returns Ein `TermuxStatus`-Objekt mit folgenden Feldern: `isTermux` (ob Termux erkannt wurde), optional `termuxVersion` und `termuxPath`, das `packages`-Objekt (`nodejs`, `bun`, `git`) mit Installationsflags sowie optional `shellProfile` (voraussichtlicher Pfad zur Shell-Profil-Datei).
+ */
 export function detectTermux(): TermuxStatus {
   const termuxVersion = process.env.TERMUX_VERSION
   const isTermux = !!termuxVersion
@@ -58,7 +62,15 @@ export function detectTermux(): TermuxStatus {
   return status
 }
 
-// ─── Run pkg command ───────────────────────────────────────────────────
+/**
+ * Führt den Termux/Pkg-Befehl mit den angegebenen Argumenten aus und sammelt dessen Ausgaben.
+ *
+ * @param args - Argumente, die an `pkg` übergeben werden (z. B. `['install', '-y', 'git']`)
+ * @returns Ein Objekt mit den Ausgaben des Prozesses:
+ * - `success`: `true` wenn der Prozess mit Exit-Code `0` beendet wurde, `false` sonst.
+ * - `stdout`: Der kombinierte Standardausgabetext, getrimmt.
+ * - `stderr`: Der kombinierte Standardfehlertext, getrimmt.
+ */
 async function runPkg(args: string[]): Promise<{ success: boolean; stdout: string; stderr: string }> {
   const subprocess = Bun.spawn({
     program: 'pkg',
@@ -104,7 +116,12 @@ async function runPkg(args: string[]): Promise<{ success: boolean; stdout: strin
   return { success: exitCode === 0, stdout: stdout.trim(), stderr: stderr.trim() }
 }
 
-// ─── Install Package ───────────────────────────────────────────────────
+/**
+ * Installiert ein Paket über den Termux-Paketmanager `pkg`, falls die Laufzeitumgebung Termux ist.
+ *
+ * @param packageName - Name des zu installierenden Termux-Pakets
+ * @returns `✓ Installed <packageName>\n<stdout>` bei erfolgreicher Installation, `✗ Failed to install <packageName>\n<stderr>` bei einem Installationsfehler oder `Error: Not running in Termux. Package installation only available in Termux.` wenn die Funktion außerhalb von Termux aufgerufen wird
+ */
 export async function installPackage(packageName: string): Promise<string> {
   const status = detectTermux()
   if (!status.isTermux) {
@@ -120,7 +137,16 @@ export async function installPackage(packageName: string): Promise<string> {
   }
 }
 
-// ─── Configure Shell Profile ───────────────────────────────────────────
+/**
+ * Fügt Termux-spezifische PATH- und Alias-Konfiguration in die erkannte Shell-Profil-Datei ein.
+ *
+ * Versucht, die ermittelte Profil-Datei zu lesen (legt sie bei Bedarf neu an), hängt die
+ * Konfigurationszeilen an und schreibt nur, wenn sich der Inhalt ändert.
+ *
+ * @returns Eine Nachricht, die den Erfolg mit dem Pfad der angepassten Profil-Datei beschreibt,
+ *          oder eine Fehlermeldung, wenn die Ausführung außerhalb von Termux nicht möglich ist
+ *          oder ein Fehler beim Lesen/Schreiben aufgetreten ist.
+ */
 export async function configureShellProfile(): Promise<string> {
   const status = detectTermux()
   if (!status.isTermux || !status.shellProfile) {
@@ -162,7 +188,12 @@ export async function configureShellProfile(): Promise<string> {
   }
 }
 
-// ─── Get Setup Instructions ────────────────────────────────────────────
+/**
+ * Liefert benutzerfreundliche Anweisungen zum Termux-Setup basierend auf dem übergebenen Status.
+ *
+ * @param status - Der ermittelte Termux-Status (`TermuxStatus`), enthält u. a. `isTermux` und `packages`
+ * @returns Eine Anweisung, die entweder erklärt, dass keine Aktion erforderlich ist, fehlende Pakete auflistet und zur Installation auffordert, oder bestätigt, dass alle erforderlichen Pakete installiert sind und zur Profil-Konfiguration auffordert
+ */
 export function getSetupInstructions(status: TermuxStatus): string {
   if (!status.isTermux) {
     return 'Not running in Termux. No setup required.'

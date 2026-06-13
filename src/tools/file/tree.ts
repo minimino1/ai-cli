@@ -64,7 +64,18 @@ const DEFAULT_IGNORE = [
   'Thumbs.db',
 ]
 
-// Check if path should be ignored
+/**
+ * Prüft, ob ein Dateiname oder Verzeichnisname anhand der übergebenen Muster ignoriert werden sollte.
+ *
+ * Unterstützte Musterformen:
+ * - Beginnend mit `*`: Suffix-Vergleich (z. B. `*.ext` matcht Dateien, die mit `.ext` enden)
+ * - Endend mit `/`: Verzeichnisname (z. B. `node_modules/` matcht Verzeichnisse mit diesem Namen)
+ * - Sonst: exakte Namensübereinstimmung
+ *
+ * @param name - Der zu prüfende Dateiname oder Verzeichnisname
+ * @param ignorePatterns - Liste von Ignoriermustern (siehe unterstützte Formen oben)
+ * @returns `true` if `name` matches any pattern in `ignorePatterns`, `false` otherwise.
+ */
 function shouldIgnore(name: string, ignorePatterns: string[]): boolean {
   for (const pattern of ignorePatterns) {
     if (pattern.startsWith('*')) {
@@ -82,7 +93,13 @@ function shouldIgnore(name: string, ignorePatterns: string[]): boolean {
   return false
 }
 
-// Get icon for file/directory
+/**
+ * Wählt das passende Unicode-Icon für eine Datei oder ein Verzeichnis.
+ *
+ * @param name - Der Dateiname (oder Verzeichnisname), verwendet zur Ermittlung der Dateiendung
+ * @param isDir - Wenn `true`, wird das Verzeichnis-Icon zurückgegeben
+ * @returns Das Icon als String; für Verzeichnisse das Verzeichnis-Icon, sonst ein Icon basierend auf der Dateiendung oder das Standard-Icon
+ */
 function getIcon(name: string, isDir: boolean): string {
   if (isDir) return ICONS.dir
 
@@ -90,7 +107,14 @@ function getIcon(name: string, isDir: boolean): string {
   return ICONS[ext] || ICONS.default
 }
 
-// Format file size
+/**
+ * Formatiert eine Byte-Anzahl in eine lesbare Größe mit den Einheiten B, KB, MB oder GB.
+ *
+ * Verwendet Basis 1024 und rundet auf eine Nachkommastelle. Spezialfall: `0` wird als `0 B` formatiert.
+ *
+ * @param bytes - Anzahl Bytes (erwartet >= 0)
+ * @returns Die formatierte Größe als Zeichenkette, z. B. `0 B`, `1.5 KB`, `2.0 MB`
+ */
 function formatSize(bytes: number): string {
   if (bytes === 0) return '0 B'
   const k = 1024
@@ -99,7 +123,18 @@ function formatSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
-// Build tree recursively
+/**
+ * Erzeugt rekursiv die Zeilen für eine Verzeichnisbaum‑Darstellung und aktualisiert dabei die übergebene Statistik.
+ *
+ * @param dirPath - Pfad des aktuellen Verzeichnisses, dessen Einträge verarbeitet werden
+ * @param options - Optionen zur Steuerung von Anzeige, Filterung und Tiefe
+ * @param depth - Aktuelle Rekursionstiefe (0 = Wurzel)
+ * @param prefix - Prefix zur Ausrichtung von Zweigen und Einträgen in den zurückgegebenen Zeilen
+ * @param isLast - Gibt an, ob das aktuelle Verzeichnis das letzte Geschwisterelement ist (steuert Zeichenwahl)
+ * @param basePath - Basis-/Stammpfad der Baumdarstellung (Kontext des Aufrufs)
+ * @param stats - Mutabler Akkumulator mit Feldern `dirs`, `files` und `totalSize`, der während der Traversierung aktualisiert wird
+ * @returns Array von formatierten Zeilen, die den Baumabschnitt für `dirPath` repräsentieren
+ */
 async function buildTree(
   dirPath: string,
   options: TreeOptions,
@@ -187,7 +222,14 @@ async function buildTree(
 }
 
 /**
- * Generate a directory tree structure
+ * Erzeugt eine formatierte Verzeichnisbaum-Darstellung für den angegebenen Pfad.
+ *
+ * Resolviert relative Pfade gegen das aktuelle Arbeitsverzeichnis, baut den Baum rekursiv
+ * auf und sammelt Statistiken zu Verzeichnissen, Dateien und Gesamtgröße.
+ *
+ * @param path - Pfad zum Wurzelverzeichnis (relative Pfade werden gegen `process.cwd()` aufgelöst)
+ * @param options - Optionen zur Steuerung der Ausgabe (z. B. `maxDepth`, `ignorePatterns`, `icons`, `showHidden`)
+ * @returns Ein `TreeResult`-Objekt mit `tree` als mehrzeiligem Baumstring und `stats` mit `dirs`, `files` und `totalSize`
  */
 export async function tree(path: string, options: TreeOptions = {}): Promise<TreeResult> {
   const resolvedPath = resolvePath(path)
@@ -213,7 +255,10 @@ export async function tree(path: string, options: TreeOptions = {}): Promise<Tre
 }
 
 /**
- * Resolve path relative to cwd or absolute
+ * Liefert einen absoluten Pfad: gibt den Eingabepfad unverändert zurück, wenn er bereits absolut ist, andernfalls relativ zum aktuellen Arbeitsverzeichnis aufgelöst.
+ *
+ * @param path - Eingabepfad, absolut oder relativ
+ * @returns Den aufgelösten absoluten Pfad
  */
 function resolvePath(path: string): string {
   if (path.startsWith('/')) return path
@@ -221,7 +266,11 @@ function resolvePath(path: string): string {
 }
 
 /**
- * Generate a simple tree (sync version for quick operations)
+ * Erzeugt synchron eine ASCII/Unicode-Verzeichnisbaum-Darstellung und sammelt zugehörige Statistiken.
+ *
+ * @param path - Pfad zum Startverzeichnis; wird relativ zu `process.cwd()` aufgelöst, falls nicht absolut.
+ * @param options - Steueroptionen (z. B. `maxDepth`, `showHidden`, `ignorePatterns`, `icons`) zur Anpassung der Ausgabe.
+ * @returns Ein Objekt mit `tree` (mehrzeiliger Baumstring) und `stats` ({ dirs, files, totalSize } in Bytes).
  */
 export function treeSync(path: string, options: TreeOptions = {}): TreeResult {
   const resolvedPath = resolvePath(path)

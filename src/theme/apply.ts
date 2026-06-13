@@ -3,7 +3,12 @@
 import type { Theme } from './builtins.js'
 import { opencodeTheme } from '../theme.js'
 
-// Map Theme colors to opencodeTheme structure
+/**
+ * Erzeugt ein Objekt mit den Farbwerten aus `theme`, abgeglichen auf die Struktur von `opencodeTheme`.
+ *
+ * @param theme - Theme, dessen `colors` in die Felder von `opencodeTheme` gemappt werden
+ * @returns Ein Partial von `opencodeTheme`, das nur die abgebildeten Farbfelder enthält
+ */
 function mapThemeToOpenCode(theme: Theme): Partial<typeof opencodeTheme> {
   const colors = theme.colors
 
@@ -38,7 +43,11 @@ function mapThemeToOpenCode(theme: Theme): Partial<typeof opencodeTheme> {
   }
 }
 
-// ─── Apply Theme ───────────────────────────────────────────────────────
+/**
+ * Wendet das übergebene Theme auf das globale OpenCode-Theme an und benachrichtigt registrierte Listener über die Änderung.
+ *
+ * @param theme - Das Theme, dessen Farben und Einstellungen übernommen werden; die relevanten Felder werden auf das globale `opencodeTheme` gemappt und ein Theme-Änderungsereignis ausgelöst
+ */
 export function applyTheme(theme: Theme): void {
   const mapped = mapThemeToOpenCode(theme)
 
@@ -49,7 +58,13 @@ export function applyTheme(theme: Theme): void {
   emitThemeChangeEvent(theme)
 }
 
-// ─── Event Emitter for Theme Changes ───────────────────────────────────
+/**
+ * Benachrichtigt interessierte Empfänger über eine Theme-Änderung.
+ *
+ * Versendet ein browserseitiges `CustomEvent` mit dem Namen `theme:change` (Detail enthält `theme`) wenn `window` verfügbar ist, und versucht zusätzlich, dasselbe Ereignis über ein process-globales Node.js `EventEmitter`-Singleton (`global.__themeEventEmitter`) zu emitten; Fehler beim Node-Pfad werden stillschweigend ignoriert.
+ *
+ * @param theme - Das neue Theme-Objekt, das an die Event-Empfänger übergeben wird
+ */
 function emitThemeChangeEvent(theme: Theme): void {
   // This will be used by components to re-render with new colors
   // For now, we'll use a simple global event
@@ -71,7 +86,12 @@ function emitThemeChangeEvent(theme: Theme): void {
   }
 }
 
-// ─── Subscribe to Theme Changes ────────────────────────────────────────
+/**
+ * Registriert einen Listener, der bei Theme-Änderungen aufgerufen wird.
+ *
+ * @param callback - Funktion, die mit dem neuen `Theme` aufgerufen wird
+ * @returns Eine Funktion zum Abmelden des Listeners; wenn die interne Einrichtung fehlschlägt, ist die Rückgabe eine No‑Op-Funktion
+ */
 export function onThemeChange(callback: (theme: Theme) => void): () => void {
   try {
     const { EventEmitter } = require('node:events')
@@ -91,7 +111,11 @@ export function onThemeChange(callback: (theme: Theme) => void): () => void {
   }
 }
 
-// ─── Get Current Theme Colors ──────────────────────────────────────────
+/**
+ * Ermittelt alle string-basierten Farbwerte im globalen `opencodeTheme` und gibt sie als flaches Schlüssel‑Wert‑Objekt zurück.
+ *
+ * @returns Ein Objekt (`Record<string, string>`) mit Theme‑Schlüsseln und ihren Farbwerten; nur Einträge werden aufgenommen, deren Wert vom Typ `string` ist.
+ */
 export function getCurrentThemeColors(): Record<string, string> {
   const colors: Record<string, string> = {}
   for (const key of Object.keys(opencodeTheme)) {
@@ -102,7 +126,17 @@ export function getCurrentThemeColors(): Record<string, string> {
   return colors
 }
 
-// ─── Validate Theme ────────────────────────────────────────────────────
+/**
+ * Prüft ein Theme auf fehlende, erforderliche Farbdefinitionen und auf ungültige Hex-Farbwerte.
+ *
+ * Prüft, ob alle erwarteten Farbschlüssel in `theme.colors` vorhanden sind und ob alle Werte dem
+ * Format `#RRGGBB` entsprechen. Für jedes Problem wird eine prägnante Fehlermeldung erzeugt.
+ *
+ * @param theme - Das zu überprüfende Theme (insbesondere dessen `colors`-Objekt)
+ * @returns Eine Liste von Fehlermeldungen; leer, wenn keine Probleme gefunden wurden.
+ *          Fehlermeldungen haben z. B. das Format `Missing required color: <color>` oder
+ *          `Invalid hex color for <key>: <value>`.
+ */
 export function validateTheme(theme: Theme): string[] {
   const errors: string[] = []
 
@@ -133,7 +167,14 @@ export function validateTheme(theme: Theme): string[] {
   return errors
 }
 
-// ─── Create Custom Theme from Colors ───────────────────────────────────
+/**
+ * Erstellt ein Theme-Objekt aus einem Namen und einer partiellen Farbüberschreibung.
+ *
+ * @param name - Der Name des neuen Themes
+ * @param colors - Partielle Zuordnung von Farben; vorhandene Einträge überschreiben die entsprechenden Farben des Basis-Themes
+ * @param baseTheme - Optionales Basis-Theme; wenn nicht angegeben, wird `darkTheme` verwendet
+ * @returns Das zusammengesetzte `Theme` mit `colors` (Zusammenführung von Basis- und übergebenen Farben) und den `styles` des Basis-Themes
+ */
 export function createTheme(
   name: string,
   colors: Partial<Theme['colors']>,

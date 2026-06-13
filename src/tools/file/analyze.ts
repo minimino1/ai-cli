@@ -33,7 +33,20 @@ export interface DiskUsage {
 }
 
 /**
- * Analyze directory structure and statistics
+ * Analysiert einen Verzeichnisbaum und aggregiert Größen-, Zähl- und Typstatistiken.
+ *
+ * Versteckte Einträge (Namen beginnend mit `.`) sowie nicht lesbare Dateien oder Verzeichnisse werden ignoriert.
+ *
+ * @param path - Pfad zum zu analysierenden Verzeichnis; relative Pfade werden gegen das aktuelle Arbeitsverzeichnis aufgelöst
+ * @returns Ein `DirAnalysis`-Objekt mit aggregierten Daten:
+ *          - `totalSize`: gesamte Byte-Größe aller gefundenen Dateien
+ *          - `fileCount`: Anzahl gefundener Dateien
+ *          - `dirCount`: Anzahl gefundener Verzeichnisse
+ *          - `fileTypes`: Map von Dateiendungen zu `{ count, size }`
+ *          - `largestFiles`: bis zu 50 größte Dateien (`path`, `size`, `modified`)
+ *          - `oldestFiles`: bis zu 50 älteste Dateien (`path`, `size`, `modified`)
+ *          - `averageFileSize`: Durchschnittsgröße der Dateien (0, wenn keine Dateien gefunden wurden)
+ *          - `deepestPath` / `maxDepth`: Pfad und Tiefe der tiefsten gefundenen Datei
  */
 export async function analyzeDir(path: string): Promise<DirAnalysis> {
   const resolvedPath = resolvePath(path)
@@ -121,7 +134,12 @@ export async function analyzeDir(path: string): Promise<DirAnalysis> {
 }
 
 /**
- * Find largest files in directory
+ * Sucht rekursiv die größten Dateien unterhalb des angegebenen Verzeichnisses.
+ *
+ * @param path - Pfad zum Stammverzeichnis, in dem gesucht wird
+ * @param limit - Maximale Anzahl zurückgegebener Dateien (Standard: 20)
+ * @param minSize - Optionale Mindestgröße in Bytes; Dateien kleiner als dieser Wert werden ignoriert
+ * @returns Array von Dateien mit `path`, `size` und `modified`, sortiert nach Größe absteigend und auf `limit` Einträge begrenzt
  */
 export async function findLargeFiles(
   path: string,
@@ -168,7 +186,14 @@ export async function findLargeFiles(
 }
 
 /**
- * Find old files (not modified recently)
+ * Sucht rekursiv nach Dateien, deren letzte Änderung älter ist als die angegebene Anzahl Tage.
+ *
+ * Versteckte Einträge (Namen beginnend mit `.`) sowie nicht lesbare Dateien oder Verzeichnisse werden stillschweigend übersprungen.
+ *
+ * @param path - Wurzelverzeichnis für die Suche; relative Pfade werden gegen das aktuelle Arbeitsverzeichnis aufgelöst
+ * @param days - Anzahl Tage; es werden nur Dateien berücksichtigt, deren `mtime` älter ist als jetzt minus `days`
+ * @param limit - Maximale Anzahl zurückzugebender Dateien, standardmäßig 50
+ * @returns Ein Array von `LargeFile`-Einträgen der ältesten Dateien, sortiert von ältestem zu jüngstem, begrenzt auf `limit`
  */
 export async function findOldFiles(
   path: string,
@@ -218,7 +243,12 @@ export async function findOldFiles(
 }
 
 /**
- * Find empty directories
+ * Ermittelt alle Verzeichnisse unterhalb eines Startpfads, die keine nicht-versteckten Dateien oder Unterverzeichnisse enthalten.
+ *
+ * @param path - Startverzeichnis; Pfade ohne führenden Schrägstrich werden relativ zum aktuellen Arbeitsverzeichnis aufgelöst
+ * @returns Eine nach Tiefe aufsteigend sortierte Liste von `EmptyDir`-Einträgen. Jeder Eintrag enthält den Pfad relativ zum Startverzeichnis und die Tiefe.
+ *
+ * Hinweis: Einträge, deren Namen mit `.` beginnen, werden beim Suchen ignoriert. Verzeichnisse, die nicht gelesen werden können, werden als nicht leer behandelt und nicht gemeldet.
  */
 export async function emptyDirs(path: string): Promise<EmptyDir[]> {
   const resolvedPath = resolvePath(path)
@@ -261,7 +291,10 @@ export async function emptyDirs(path: string): Promise<EmptyDir[]> {
 }
 
 /**
- * Disk usage (du-like) for path
+ * Erzeugt eine du‑ähnliche Zusammenfassung von Größe und Anzahl von Dateien und Verzeichnissen für das angegebene Verzeichnis.
+ *
+ * @param path - Pfad zum zu analysierenden Verzeichnis; wird bei Bedarf relativ zum aktuellen Arbeitsverzeichnis aufgelöst
+ * @returns Ein `DiskUsage`-Objekt mit den aggregierten Feldern `size`, `fileCount`, `dirCount` und — nur für den Wurzelknoten — `children` mit den direkten Untereinträgen
  */
 export async function diskUsage(path: string): Promise<DiskUsage> {
   const resolvedPath = resolvePath(path)
@@ -333,7 +366,13 @@ export async function diskUsage(path: string): Promise<DiskUsage> {
 }
 
 /**
- * Format disk usage for display
+ * Gibt eine eingerückte, farbig formatierte Textdarstellung eines DiskUsage-Baums zurück.
+ *
+ * Formatiert jeden Knoten als eine Zeile mit Pfad, lesbarer Größe sowie Datei- und Verzeichnisanzahl; untergeordnete Knoten werden zeilenweise angehängt und eingerückt.
+ *
+ * @param usage - Die Wurzel des zu formatierenden DiskUsage-Baums
+ * @param indent - Start-Einrückungsstufe (0 für keine Einrückung)
+ * @returns Eine mehrzeilige Zeichenkette mit der formatierten Darstellung des Baums
  */
 export function formatDiskUsage(usage: DiskUsage, indent: number = 0): string {
   const lines: string[] = []
@@ -355,7 +394,14 @@ export function formatDiskUsage(usage: DiskUsage, indent: number = 0): string {
 }
 
 /**
- * Format analysis for display
+ * Erzeugt eine farbige, zeilenorientierte Textdarstellung der Verzeichnisanalyse.
+ *
+ * Gibt eine menschenlesbare Übersicht mit Gesamtgröße, Datei-/Verzeichnis‑Anzahl,
+ * durchschnittlicher Dateigröße, maximaler Tiefe, Aufschlüsselung nach Dateitypen
+ * und einer Liste der größten Dateien zurück.
+ *
+ * @param analysis - Das zu formatierende Analyseobjekt
+ * @returns Ein mehrzeiliger String (Zeilen mit '\n' getrennt) mit den formatierten Analyseergebnissen
  */
 export function formatAnalysis(analysis: DirAnalysis): string {
   const lines: string[] = []
@@ -391,6 +437,12 @@ export function formatAnalysis(analysis: DirAnalysis): string {
   return lines.join('\n')
 }
 
+/**
+ * Formatiert eine Byte-Anzahl in eine menschenlesbare Darstellung mit Einheiten B/KB/MB/GB/TB.
+ *
+ * @param bytes - Anzahl der Bytes
+ * @returns Die formatierte Größe, z. B. "0 B" oder "1.2 MB"
+ */
 function formatSize(bytes: number): string {
   if (bytes === 0) return '0 B'
   const k = 1024
@@ -399,6 +451,12 @@ function formatSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
+/**
+ * Löst einen Eingabepfad zu einem absoluten Pfad auf.
+ *
+ * @param path - Der Eingabepfad; beginnt er mit `'/'`, wird er als absolut behandelt, andernfalls relativ zum aktuellen Arbeitsverzeichnis aufgelöst.
+ * @returns Den absoluten Pfad
+ */
 function resolvePath(path: string): string {
   if (path.startsWith('/')) return path
   return join(process.cwd(), path)
@@ -408,7 +466,10 @@ import { statSync, readdirSync } from 'fs'
 import { basename } from 'path'
 
 /**
- * Sync version of analyzeDir
+ * Analysiert synchron ein Verzeichnis und erzeugt Metriken sowie Listen zu seinen Dateien.
+ *
+ * @param path - Pfad zum zu analysierenden Verzeichnis; wird mittels `resolvePath` in einen absoluten Pfad aufgelöst
+ * @returns Ein `DirAnalysis`-Objekt mit Gesamtgröße, Datei- und Verzeichnisanzahl, einer `Map` pro Dateierweiterung (Anzahl und kumulierte Größe), Listen der größten und ältesten Dateien (jeweils bis zu 50), durchschnittlicher Dateigröße, dem tiefsten gefundenen Pfad und der maximalen Tiefe
  */
 export function analyzeDirSync(path: string): DirAnalysis {
   const resolvedPath = resolvePath(path)

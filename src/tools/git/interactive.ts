@@ -21,7 +21,16 @@ const colors = {
   bold: '\x1b[1m',
 }
 
-// ─── Run Git Command ───────────────────────────────────────────────
+/**
+ * Führt den `git`-Befehl mit den angegebenen Argumenten aus und sammelt dessen Ausgabe.
+ *
+ * @param args - Array der an `git` weiterzureichenden Argumente (ohne das Programm selbst)
+ * @returns Ein `GitResult`-Objekt mit:
+ *  - `success`: `true` wenn der Prozess-Exit-Code `0` ist, `false` sonst,
+ *  - `exitCode`: der numerische Exit-Code des Prozesses,
+ *  - `stdout`: die getrimmte Standardausgabe als Zeichenkette,
+ *  - `stderr`: die getrimmte Standardfehlerausgabe als Zeichenkette
+ */
 async function runGit(args: string[]): Promise<GitResult> {
   const subprocess = Bun.spawn({
     program: 'git',
@@ -70,8 +79,10 @@ async function runGit(args: string[]): Promise<GitResult> {
 // ─── Stash Operations ───────────────────────────────────────────────
 
 /**
- * Create a stash with optional message
- * Usage: git stash push -m "message"
+ * Erstellt einen Git-Stash mit einer optionalen Beschreibung.
+ *
+ * @param message - Optionale Nachricht, die dem Stash zugewiesen wird
+ * @returns Ein formatierter String: bei Erfolg eine grüne Bestätigung gefolgt von Git-`stdout`, bei Fehler eine rote Fehlermeldung mit Git-`stderr`
  */
 export async function stashCreate(message?: string): Promise<string> {
   const args = ['stash', 'push']
@@ -89,8 +100,12 @@ export async function stashCreate(message?: string): Promise<string> {
 }
 
 /**
- * List all stashes
- * Usage: git stash list
+ * Gibt die vorhandenen Git-Stashes als formatierten Text zurück.
+ *
+ * @returns Ein formatierter, ggf. farbiger String:
+ * - Bei Erfolg: die Liste der Stashes, ein Eintrag pro Zeile (Stash-Referenz und Nachricht).
+ * - Wenn keine Stashes vorhanden sind: ein Hinweistext.
+ * - Bei Fehlern: eine Fehlermeldung, die den von `git` gelieferten Fehlertext enthält.
  */
 export async function stashList(): Promise<string> {
   const result = await runGit(['stash', 'list'])
@@ -117,8 +132,10 @@ export async function stashList(): Promise<string> {
 }
 
 /**
- * Apply a stash by index (default 0)
- * Usage: git stash apply [stash@{index}]
+ * Wendet einen Stash anhand seines Indexes an.
+ *
+ * @param index - Index des Stash-Eintrags; `0` entspricht dem zuletzt erstellten Stash
+ * @returns Einen formatierten Text: bei Erfolg eine Bestätigung inklusive der Git-Ausgabe, bei Fehler eine Fehlermeldung inklusive der Git-Fehlerausgabe
  */
 export async function stashApply(index: number = 0): Promise<string> {
   const stashRef = `stash@{${index}}`
@@ -132,8 +149,10 @@ export async function stashApply(index: number = 0): Promise<string> {
 }
 
 /**
- * Pop a stash (apply and drop)
- * Usage: git stash pop [stash@{index}]
+ * Poppt einen Stash — wendet den angegebenen Stash an und entfernt ihn aus der Stash-Liste.
+ *
+ * @param index - Index des Stash-Eintrags (z. B. `0` → `stash@{0}`); Standard ist `0`
+ * @returns Eine formatierte Meldung: bei Erfolg eine grüne Bestätigung mit der Stash-Referenz und dem `git`-Ausgabe-Text; bei Fehler eine rote Fehlermeldung mit dem `git`-Fehlertext.
  */
 export async function stashPop(index: number = 0): Promise<string> {
   const stashRef = `stash@{${index}}`
@@ -147,8 +166,10 @@ export async function stashPop(index: number = 0): Promise<string> {
 }
 
 /**
- * Drop a stash by index
- * Usage: git stash drop [stash@{index}]
+ * Entfernt einen Stash-Eintrag anhand seines Index.
+ *
+ * @param index - Der numerische Index des Stash-Eintrags (erzeugt `stash@{<index>}`), Standard ist `0`
+ * @returns Eine formatierte Statusmeldung: bei Erfolg eine Bestätigung, bei Fehler eine Fehlermeldung, die `stderr` enthält
  */
 export async function stashDrop(index: number = 0): Promise<string> {
   const stashRef = `stash@{${index}}`
@@ -164,8 +185,11 @@ export async function stashDrop(index: number = 0): Promise<string> {
 // ─── Bisect Operations ───────────────────────────────────────────────
 
 /**
- * Start a bisect session
- * Usage: git bisect start <bad> <good>
+ * Startet eine Bisect-Sitzung mit einem bekannten guten und einem bekannten schlechten Commit.
+ *
+ * @param good - Commit-Referenz, die als bekannt guter Commit gilt
+ * @param bad - Commit-Referenz, die als bekannt schlechter Commit gilt; standardmäßig `HEAD`
+ * @returns Bei Erfolg eine grün formatierte Bestätigung gefolgt von der Git-Ausgabe; bei Fehlern eine rot formatierte Fehlermeldung mit dem von Git gelieferten Fehlertext
  */
 export async function bisectStart(good: string, bad: string = 'HEAD'): Promise<string> {
   const result = await runGit(['bisect', 'start', bad, good])
@@ -178,8 +202,9 @@ export async function bisectStart(good: string, bad: string = 'HEAD'): Promise<s
 }
 
 /**
- * Mark current commit as good
- * Usage: git bisect good
+ * Markiert den aktuellen Commit im laufenden Bisect-Vorgang als "good".
+ *
+ * @returns Eine formatierte Zeichenkette: bei Erfolg eine grüne Bestätigungzeile gefolgt von der Git-Ausgabe, bei Fehler eine rote Fehlermeldung, die `stderr` enthält.
  */
 export async function bisectGood(): Promise<string> {
   const result = await runGit(['bisect', 'good'])
@@ -192,8 +217,9 @@ export async function bisectGood(): Promise<string> {
 }
 
 /**
- * Mark current commit as bad
- * Usage: git bisect bad
+ * Markiert den aktuellen Commit als fehlerhaft im laufenden Git-Bisect-Vorgang.
+ *
+ * @returns Eine formatierte Meldung: bei Erfolg eine grüne Bestätigung mit der Git-Ausgabe, bei Fehler eine rote Fehlermeldung mit dem Git-Fehlertext
  */
 export async function bisectBad(): Promise<string> {
   const result = await runGit(['bisect', 'bad'])
@@ -206,8 +232,9 @@ export async function bisectBad(): Promise<string> {
 }
 
 /**
- * Reset bisect session
- * Usage: git bisect reset
+ * Setzt die aktuelle Git-Bisect-Sitzung zurück.
+ *
+ * @returns Eine formatierte Bestätigungsnachricht bei Erfolg; im Fehlerfall eine formatierte Fehlermeldung, die die `stderr`-Ausgabe von Git enthält.
  */
 export async function bisectReset(): Promise<string> {
   const result = await runGit(['bisect', 'reset'])
@@ -222,8 +249,11 @@ export async function bisectReset(): Promise<string> {
 // ─── Worktree Operations ─────────────────────────────────────────────
 
 /**
- * Add a new worktree
- * Usage: git worktree add <path> [branch]
+ * Fügt ein neues Git-Worktree-Verzeichnis am angegebenen Pfad hinzu.
+ *
+ * @param path - Zielpfad für das neue Worktree
+ * @param branch - Optionaler Zweigname, der im neuen Worktree ausgecheckt oder erstellt werden soll
+ * @returns Eine formatierte Meldung als String: bei Erfolg eine grüne Bestätigung mit Pfad und Git-Ausgabe, bei Fehler eine rote Fehlermeldung mit Git `stderr`
  */
 export async function worktreeAdd(path: string, branch?: string): Promise<string> {
   const args = ['worktree', 'add', path]
@@ -241,8 +271,13 @@ export async function worktreeAdd(path: string, branch?: string): Promise<string
 }
 
 /**
- * List all worktrees
- * Usage: git worktree list
+ * Gibt die vorhandenen Git-Arbeitsbäume in einer formatierten, farbcodierten Liste zurück.
+ *
+ * Bei Erfolg enthält die Rückgabe pro Worktree eine Zeile mit Pfad und Branch (farbig formatiert).
+ * Wenn keine Worktrees gefunden werden, enthält die Rückgabe eine Hinweisnachricht.
+ * Bei einem Fehler enthält die Rückgabe eine Fehlermeldung, die die Git-Fehlerausgabe einschließt.
+ *
+ * @returns Eine formatierte Zeichenkette mit den aufgelisteten Worktrees; bei keinem Worktree eine Hinweisnachricht; bei Fehlern eine Fehlermeldung mit der Git-Fehlerausgabe
  */
 export async function worktreeList(): Promise<string> {
   const result = await runGit(['worktree', 'list'])
@@ -270,8 +305,10 @@ export async function worktreeList(): Promise<string> {
 }
 
 /**
- * Remove a worktree
- * Usage: git worktree remove <path>
+ * Entfernt einen Git-Worktree an dem angegebenen Pfad.
+ *
+ * @param path - Pfad des zu entfernenden Worktrees
+ * @returns Eine formatierte Statusnachricht: bei Erfolg eine grüne Bestätigung mit dem Pfad und der Ausgabe des Befehls, bei Fehler eine rote Fehlermeldung mit der `stderr`-Ausgabe
  */
 export async function worktreeRemove(path: string): Promise<string> {
   const result = await runGit(['worktree', 'remove', path])
@@ -286,8 +323,10 @@ export async function worktreeRemove(path: string): Promise<string> {
 // ─── Interactive Rebase ──────────────────────────────────────────────
 
 /**
- * Start an interactive rebase
- * Usage: git rebase -i <commit>
+ * Startet einen interaktiven Rebase ab einem angegebenen Commit.
+ *
+ * @param commit - Commit-Hash oder Ref, ab dem der interaktive Rebase gestartet wird (z. B. `HEAD~3`)
+ * @returns Eine farbcodierte Nachricht: bei Erfolg eine grüne Bestätigung gefolgt von der Git-Ausgabe, bei Fehler eine rote Fehlermeldung mit der `stderr`-Ausgabe
  */
 export async function interactiveRebase(commit: string): Promise<string> {
   const result = await runGit(['rebase', '-i', commit])

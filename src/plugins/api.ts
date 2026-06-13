@@ -23,7 +23,11 @@ const pluginCommands = new Map<string, PluginCommand>()
 const configPath = `${process.env.HOME || process.env.USERPROFILE || ''}/.config/ai-cli/plugins-config.json`
 let pluginConfig: Record<string, PluginConfig> = {}
 
-// Load plugin config from disk
+/**
+ * Lädt die persistente Plugin-Konfiguration von der Datei `configPath` in den Modulzustand `pluginConfig`.
+ *
+ * Falls das Laden oder Parsen fehlschlägt, wird `pluginConfig` auf ein leeres Objekt zurückgesetzt.
+ */
 async function loadPluginConfig(): Promise<void> {
   try {
     const fs = await import('node:fs/promises')
@@ -34,7 +38,11 @@ async function loadPluginConfig(): Promise<void> {
   }
 }
 
-// Save plugin config to disk
+/**
+ * Persistiert die aktuelle Plugin-Konfiguration auf Festplatte unter dem in `configPath` definierten Pfad.
+ *
+ * Erstellt bei Bedarf das Zielverzeichnis und schreibt die Konfiguration als formatiertes JSON. Bei Fehlern beim Schreiben wird ein Fehlerprotokoll ausgegeben.
+ */
 async function savePluginConfig(): Promise<void> {
   try {
     const fs = await import('node:fs/promises')
@@ -49,7 +57,19 @@ async function savePluginConfig(): Promise<void> {
 // Initialize config
 await loadPluginConfig()
 
-// ─── Plugin Context Implementation ────────────────────────────────────
+/**
+ * Erstellt einen Plugin-spezifischen Kontext mit API für Befehlsregistrierung, konfigurations‑Persistenz,
+ * Messaging, Date- und Shell-Operationen, Ereignisverwaltung sowie Logging und Hilfswerte.
+ *
+ * @param manifest - Manifest des Plugins; `manifest.name` wird als Pluginkennung (prefix für Befehle) verwendet
+ * @param deps - Optionale Integrationen:
+ *   - `sendToAI` zur Weiterleitung von Nachrichten an die Host-AI,
+ *   - `registerMainCommand`/`unregisterMainCommand` zum Registrieren/Entfernen von Befehlen in der Hauptanwendung
+ * @returns Ein PluginContext-Objekt mit Methoden zum Registrieren/Abmelden von Befehlen, Lesen/Schreiben von plugin‑konfigurationsdaten,
+ *          Senden von Nachrichten an die Host-AI (oder Fallback), Dateioperationen (`readFile`, `listFiles`, `writeFile`, `deleteFile`),
+ *          Ausführen von Shell-Befehlen (`executeCommand`), Ereignis-Subscription/Emission (`onEvent`, `emitEvent`),
+ *          Logging (`log`) sowie `cwd` und `env`.
+ */
 export function createPluginContext(
   manifest: PluginManifest,
   deps: {
@@ -232,17 +252,34 @@ export function createPluginContext(
   }
 }
 
-// ─── Get Registered Plugin Commands ───────────────────────────────────
+/**
+ * Liefert die globale Map mit registrierten Plugin-Befehlen, wobei der Schlüssel im Format `pluginName:commandName` vorliegt.
+ *
+ * @returns Die Map von vollqualifizierten Befehlsnamen zu den zugehörigen `PluginCommand`-Definitionen
+ */
 export function getPluginCommands(): Map<string, PluginCommand> {
   return pluginCommands
 }
 
-// ─── Clear Plugin Commands (for testing/reload) ───────────────────────
+/**
+ * Entfernt alle Einträge aus dem gemeinsamen Registry mit Plugin-Befehlen.
+ *
+ * Diese Funktion löscht sämtliche gespeicherten Plugin-Kommandos aus der internen
+ * Map, wodurch das Registry leer ist.
+ */
 export function clearPluginCommands(): void {
   pluginCommands.clear()
 }
 
-// ─── Emit Global Event ───────────────────────────────────────────────
+/**
+ * Löst ein globales Plugin-Ereignis aus und ruft alle dafür registrierten Handler auf.
+ *
+ * Jeder Handler wird mit dem optionalen `data`-Payload aufgerufen; auftretende synchrone oder
+ * asynchrone Fehler werden abgefangen und auf der Konsole geloggt, aber nicht weitergeworfen.
+ *
+ * @param event - Der Typ des auszulösenden Plugin-Ereignisses
+ * @param data - Optionaler Nutzdaten-Payload, der an die Handler übergeben wird
+ */
 export function emitPluginEvent<T = unknown>(event: PluginEventType, data?: T): void {
   const handlers = eventBus.get(event)
   if (handlers) {

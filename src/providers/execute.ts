@@ -5,7 +5,11 @@ import { extname } from 'node:path'
 import { writeFile, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 
-// Generate a unique temporary binary path
+/**
+ * Erzeugt einen eindeutigen temporären Pfad für eine kompiliierte Binärdatei.
+ *
+ * @returns Ein Pfad im `/tmp`-Verzeichnis im Format `/tmp/ai-cli-out-<timestamp>-<random>`.
+ */
 function getTempBinaryPath(): string {
   const timestamp = Date.now()
   const random = Math.random().toString(36).substring(2, 11)
@@ -61,7 +65,15 @@ export function detectLanguage(filename: string): string {
   return langMap[ext] || 'text'
 }
 
-// ─── Run Command ───────────────────────────────────────────────────
+/**
+ * Führt ein externes Kommando mit Argumenten aus, sammelt stdout/stderr, und liefert das Ausführungsresultat.
+ *
+ * @param command - Pfad oder Name des auszuführenden Programms
+ * @param args - Argumentliste für das Programm
+ * @param timeoutMs - Maximale Ausführungsdauer in Millisekunden bevor der Prozess mit SIGKILL beendet wird
+ * @param stdin - Optionaler Inhalt, der dem Prozess über STDIN geschrieben wird
+ * @returns Das Ausführungsresultat: `success` ist `true` bei Exit-Code `0`, `exitCode` ist der numerische Rückgabewert, `stdout`/`stderr` sind getrimmte Ausgaben, `language` ist leer, `command` ist die ausgeführte Befehlszeile und `timedOut` zeigt an, ob ein Timeout aufgetreten ist.
+ */
 async function runCommand(
   command: string,
   args: string[],
@@ -158,7 +170,11 @@ async function runCommand(
    }
 }
 
-// ─── Execute File ──────────────────────────────────────────────────
+/**
+ * Führt die gegebene Quelldatei aus oder kompiliert und führt sie aus, je nach erkannter Programmiersprache.
+ *
+ * @returns Eine formatierte Ergebnisbeschreibung der Ausführung für `filePath`; bei Kompilierungsfehlern wird der String `Compilation failed:\n<stderr>` zurückgegeben; bei nicht unterstützter Sprache wird eine entsprechende Fehlermeldung zurückgegeben.
+ */
 export async function executeFile(filePath: string): Promise<string> {
   const language = detectLanguage(filePath)
 
@@ -221,7 +237,13 @@ export async function executeFile(filePath: string): Promise<string> {
   return formatResult(result, language, filePath)
 }
 
-// ─── Execute Code Snippet ──────────────────────────────────────────
+/**
+  * Führt den übergebenen Quellcode in der angegebenen Sprache aus und gibt einen formatierten Ausführungsbericht zurück.
+  *
+  * @param code - Der auszuführende Quellcode
+  * @param language - Sprachbezeichner; unterstützt: `python`, `javascript`, `typescript`, `go`, `rust`, `ruby`, `bash`, `sh`, `php`, `c`, `cpp`
+  * @returns Einen formatieren Bericht mit Datei-, Ausgabe- und Fehlermeldungen, Exit-Code und dem ausgeführten Befehl oder eine Fehlermeldung, wenn die Sprache nicht unterstützt wird
+  */
 export async function executeCode(code: string, language: string): Promise<string> {
   const tmpFile = `/tmp/ai-cli-exec-${Date.now()}`
 
@@ -255,7 +277,18 @@ export async function executeCode(code: string, language: string): Promise<strin
    }
  }
 
-// ─── Format Result ─────────────────────────────────────────────────
+/**
+ * Erzeugt einen formatierten Bericht über die Ausführung eines Prozesses.
+ *
+ * Der Bericht enthält: Kopfzeile mit Dateipfad und Sprache, Trennlinie, optionalen Timeout-Hinweis,
+ * die zusammengeführten `stdout`- und `stderr`-Blöcke (bei beiden Ausgaben wird vor `stderr` eine Leerzeile eingefügt),
+ * oder `(No output)` falls keine Ausgabe vorliegt, gefolgt von einer abschließenden Trennlinie, dem Exit-Code und dem ausgeführten Befehl.
+ *
+ * @param result - Das Ausführungsergebnis (z. B. `stdout`, `stderr`, `exitCode`, `command`, optional `timedOut`)
+ * @param language - Die angezeigte Programmiersprache für die Kopfzeile
+ * @param filePath - Der angezeigte Pfad oder Name der ausgeführten Datei
+ * @returns Den vollständigen, mehrzeiligen Bericht als String
+ */
 function formatResult(
   result: ExecuteResult,
   language: string,

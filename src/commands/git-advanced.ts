@@ -7,14 +7,24 @@ import * as gitBlame from '../tools/git/blame'
 import * as gitAnalyze from '../tools/git/analyze'
 import type { Command, CommandContext } from '../types'
 
-// ─── Helper: Parse Stash Index ────────────────────────────────────────
+/**
+ * Extrahiert die Indexnummer aus einem Stash-Identifikator wie `stash@{N}` oder aus einem reinen Zahlen-String.
+ *
+ * @param arg - Eingabe, z. B. `stash@{3}` oder `3`
+ * @returns Die gefundene Ganzzahl `N`; `0` wenn keine Zahl im Eingabestring vorhanden ist
+ */
 function parseStashIndex(arg: string): number {
   // Extract number from stash@{N} or just N
   const match = arg.match(/\d+/)
   return match ? parseInt(match[0]) : 0
 }
 
-// ─── Helper: Parse Bisect Args ────────────────────────────────────────
+/**
+ * Parst einen Argumentstring für `git bisect` und extrahiert optional die `good`- und `bad`-Revisionen.
+ *
+ * @param args - Whitespace-getrimmter Argumentstring (z. B. `"v1.0 v2.0"` oder `"good"`)
+ * @returns Ein Objekt mit optionalen Feldern `good` und `bad`. Bei zwei oder mehr Tokens werden die ersten beiden als `good` bzw. `bad` verwendet. Wenn genau ein Token vorliegt und dieses genau `"good"` oder `"bad"` ist, wird dieses Feld auf `"HEAD"` gesetzt.
+ */
 function parseBisectArgs(args: string): { good?: string; bad?: string } {
   const parts = args.trim().split(/\s+/)
   const result: { good?: string; bad?: string } = {}

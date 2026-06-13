@@ -2,7 +2,16 @@
 // Test, find, explain, and suggest regex patterns
 
 /**
- * Test regex pattern against input
+ * Prüft ein reguläres Ausdrucksmuster gegen einen Eingabetext und liefert Trefferinformation sowie gefundene Gruppen.
+ *
+ * @param pattern - Das Regex-Muster als Zeichenkette
+ * @param flags - Optionale Regex-Flags (z. B. `"g"`, `"i"`, `"m"`)
+ * @param input - Der zu testende Eingabetext
+ * @returns Ein Objekt mit:
+ * - `match`: `true` wenn mindestens ein Treffer gefunden wurde, `false` sonst.
+ * - `matches`: Das erste `RegExpMatchArray`-Ergebnis oder `null` wenn kein Treffer vorliegt.
+ * - `groups` (optional): Ein Mapping gefangener Gruppen; positionsbasierte Gruppen sind als `group1`, `group2`, … vorhanden und benannte Gruppen (falls vorhanden) werden zusätzlich eingefügt.
+ * @throws Error Wenn das Muster oder die Flags ungültig sind (Fehlermeldung beginnt mit `Invalid regex:`)
  */
 export function testRegex(pattern: string, flags: string = '', input: string): {
   match: boolean
@@ -41,7 +50,14 @@ export function testRegex(pattern: string, flags: string = '', input: string): {
 }
 
 /**
- * Find all matches with positions
+ * Sucht alle Vorkommen eines regulären Ausdrucks im Eingabetext und liefert Treffer mit Positionen und gefangenen Gruppen.
+ *
+ * @param pattern - Die Regex-Vorlage (ohne umschließende Schrägstriche)
+ * @param flags - Regex-Flags; falls `g` fehlt, wird sie automatisch angefügt, damit alle Vorkommen gefunden werden
+ * @param input - Der zu durchsuchende Text
+ * @returns Ein Array von Treffern; jedes Element enthält `match` (die gefundene Zeichenkette), `index` (Startposition im Eingabetext) und optional `groups` (positional als `group1`, `group2`, … mit leeren Strings für nicht gefangene Gruppen sowie alle benannten Gruppen)
+ * 
+ * Hinweis: Bei null-langen Treffern wird die Suche vorwärts verschoben, um Endlosschleifen zu vermeiden.
  */
 export function findRegex(pattern: string, flags: string = '', input: string): Array<{
   match: string
@@ -89,7 +105,14 @@ export function findRegex(pattern: string, flags: string = '', input: string): A
 }
 
 /**
- * Generate human-readable explanation of regex pattern
+ * Erzeugt eine zeilenweise menschenlesbare Erklärung eines Regex-Patterns.
+ *
+ * Beschreibt die im Pattern vorkommenden Token und Konstrukte (z. B. Escape-Sequenzen, Zeichenklassen,
+ * Gruppen, Lookarounds, Alternation, Anker und Quantifizierer) und hängt am Ende eine kurze Erläuterung
+ * gängiger Regex-Flags an.
+ *
+ * @param pattern - Das zu erklärende Regex-Muster
+ * @returns Mehrzeilige Textbeschreibung der einzelnen Token, Gruppen, Klassen, Quantifizierer, Assertions und gängigen Flags
  */
 export function explainRegex(pattern: string): string {
   const explanation: string[] = []
@@ -200,6 +223,12 @@ export function explainRegex(pattern: string): string {
   return explanation.join('\n')
 }
 
+/**
+ * Liefert eine kurze, menschenlesbare Beschreibung für ein einzelnes Regex-Escape-Zeichen.
+ *
+ * @param escaped - Das nach dem Backslash stehende Zeichen (z. B. `'d'` für `\d`)
+ * @returns Eine beschreibende Zeichenkette für das Escape (z. B. `digit (0-9)`). Für unbekannte Escape-Zeichen wird `special character: <zeichen>` zurückgegeben.
+ */
 function getEscapedMeaning(escaped: string): string {
   const meanings: Record<string, string> = {
     d: 'digit (0-9)',
@@ -217,6 +246,12 @@ function getEscapedMeaning(escaped: string): string {
   return meanings[escaped] || `special character: ${escaped}`
 }
 
+/**
+ * Gibt eine kurze, menschenlesbare Beschreibung des Inhalts einer Regex-Zeichenklasse zurück.
+ *
+ * @param content - Der Inhalt der Zeichenklasse ohne die umschließenden eckigen Klammern (z. B. `a-z`, `^0-9`, `a-zA-Z0-9`)
+ * @returns Eine lesbare Beschreibung des Inhalts (z. B. `digits 0-9`, `lowercase letters a-z`, `negated - any character except: ...` oder `character set: ...`)
+ */
 function getCharClassMeaning(content: string): string {
   if (content.startsWith('^')) {
     return `negated - any character except: ${content.slice(1)}`
@@ -251,15 +286,23 @@ export const commonPatterns = {
 }
 
 /**
- * Get a common pattern by name
+ * Gibt ein vordefiniertes reguläres Muster anhand seines Schlüssels zurück.
+ *
+ * @param name - Der Schlüssel des gewünschten Musters aus `commonPatterns`
+ * @returns Das zugehörige `RegExp`-Objekt, oder `undefined`, wenn kein Muster unter dem Namen existiert
  */
 export function getCommonPattern(name: keyof typeof commonPatterns): RegExp | undefined {
   return commonPatterns[name]
 }
 
 /**
- * Suggest regex based on description (simple rule-based)
- * This is a basic implementation - for complex cases, use AI
+ * Schlägt basierend auf einer freitextlichen Beschreibung ein passendes Regex-Muster, die zugehörigen Flags und eine kurze Erklärung vor.
+ *
+ * @param description - Freitextbeschreibung oder Stichworte (z. B. "email", "phone", "iso date")
+ * @returns Ein Objekt mit den Feldern:
+ * - `pattern`: das vorgeschlagene reguläre Ausdrucksmuster als Zeichenkette (leer, wenn keine Empfehlung vorliegt),
+ * - `flags`: die empfohlenen RegExp-Flags als Zeichenkette,
+ * - `explanation`: eine kurze, menschenlesbare Beschreibung des Vorschlags
  */
 export function suggestRegex(description: string): { pattern: string; flags: string; explanation: string } {
   const desc = description.toLowerCase()

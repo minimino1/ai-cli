@@ -2,7 +2,12 @@
 // Supports: format, minify, validate, convert, JSONPath queries
 
 /**
- * Pretty print JSON with custom indent
+ * Formatiert (pretty-prints) einen JSON-String mit der angegebenen Einrückung.
+ *
+ * @param str - Der zu formatierende JSON-String
+ * @param indent - Anzahl Leerzeichen pro Einrückungsstufe (Standard: 2)
+ * @returns Den formatierten JSON-String
+ * @throws Wenn `str` kein gültiger JSON-String ist; die Fehlermeldung enthält die Parser-Fehlermeldung
  */
 export function formatJSON(str: string, indent: number = 2): string {
   try {
@@ -14,7 +19,11 @@ export function formatJSON(str: string, indent: number = 2): string {
 }
 
 /**
- * Minify JSON (remove all whitespace)
+ * Entfernt alle nicht-signifikanten Leerzeichen aus einem JSON-Text.
+ *
+ * @param str - Die Eingabe-Zeichenkette, die gültiges JSON enthalten muss
+ * @returns Die komprimierte JSON-Zeichenkette ohne unnötige Leerzeichen
+ * @throws Wenn `str` kein gültiges JSON ist, wird ein Error mit `Invalid JSON: <ursprüngliche Meldung>` geworfen
  */
 export function minifyJSON(str: string): string {
   try {
@@ -26,7 +35,10 @@ export function minifyJSON(str: string): string {
 }
 
 /**
- * Validate JSON and return detailed error info
+ * Prüft, ob ein String gültiges JSON ist und liefert bei Fehlern strukturierte Diagnoseinformationen.
+ *
+ * @param str - Der zu prüfende JSON-Text
+ * @returns Ein Objekt mit `valid: true` bei erfolgreichem Parsen; bei `valid: false` enthält `error` die Fehlermeldung und `line`/`col` (1-basiert) die geschätzte Position des Fehlers, falls verfügbar.
  */
 export function validateJSON(str: string): { valid: boolean; error?: string; line?: number; col?: number } {
   try {
@@ -55,9 +67,12 @@ export function validateJSON(str: string): { valid: boolean; error?: string; lin
 }
 
 /**
- * Convert JSON to another format (YAML, TOML, CSV)
- * Note: For YAML/TOML conversion, we use simple string building
- * CSV conversion assumes array of objects with same keys
+ * Konvertiert eine JSON-Zeichenkette in das angegebene Zielformat.
+ *
+ * @param str - Die Eingabe-JSON als Zeichenkette
+ * @param format - Zielformat: `yaml`, `toml` oder `csv` (kleingeschrieben oder gemischt)
+ * @returns Die konvertierten Daten als Zeichenkette im gewählten Format
+ * @throws Error wenn `format` nicht `yaml`, `toml` oder `csv` ist
  */
 export function convertJSON(str: string, format: 'yaml' | 'toml' | 'csv'): string {
   const data = JSON.parse(str)
@@ -75,7 +90,15 @@ export function convertJSON(str: string, format: 'yaml' | 'toml' | 'csv'): strin
 }
 
 /**
- * Simple JSON to YAML converter
+ * Konvertiert einen JavaScript-Wert in eine einfache YAML-Darstellung.
+ *
+ * Unterstützte Eingabetypen: `null`, `boolean`, `number`, `string`, Arrays und Objekte.
+ * Leere Arrays/Objekte werden als `[]` bzw. `{}` ausgegeben. Zeichenketten, die `:`, `#`
+ * oder Zeilenumbrüche enthalten, werden in doppelte Anführungszeichen gesetzt und `"`-Zeichen escaped.
+ *
+ * @param data - Der zu konvertierende Wert
+ * @param indent - Aktuelles Einzugsniveau für verschachtelte Strukturen (je Level werden zwei Leerzeichen hinzugefügt)
+ * @returns Die YAML-Repräsentation von `data` als String
  */
 function jsonToYaml(data: any, indent: number = 0): string {
   const indentStr = '  '.repeat(indent)
@@ -126,7 +149,14 @@ function jsonToYaml(data: any, indent: number = 0): string {
 }
 
 /**
- * Simple JSON to TOML converter
+ * Konvertiert einen JSON-kompatiblen Wert in eine TOML-Repräsentation.
+ *
+ * Diese Funktion wandelt primitive Werte, Arrays und verschachtelte Objekte in ein TOML-Fragment um.
+ * Bei verschachtelten Objekten werden Abschnittsüberschriften (`[section]`) erzeugt; `null` auf oberster Ebene ergibt eine leere Zeichenkette.
+ *
+ * @param data - Der JSON-kompatible Eingabewert (Primitiven, Array oder Objekt), der in TOML konvertiert werden soll
+ * @param prefix - Optionaler Schlüsselpräfix für verschachtelte Objektfelder; wird zur Bildung von Tabellenpfaden verwendet
+ * @returns Eine Zeichenkette mit der TOML-Darstellung von `data` (kann ein Fragment mit Tabellen/Schlüsseln, ein Array-Literal oder eine Primitive als String sein)
  */
 function jsonToToml(data: any, prefix: string = ''): string {
   const lines: string[] = []
@@ -176,7 +206,12 @@ function jsonToToml(data: any, prefix: string = ''): string {
 }
 
 /**
- * Convert JSON array of objects to CSV
+ * Konvertiert ein JSON-Array von Objekten in eine CSV-Zeichenfolge.
+ *
+ * Die Kopfzeile wird aus den Schlüsseln des ersten Objekts gebildet; Felder mit `null` oder `undefined` werden als leere Einträge ausgegeben. Felder, die Komma, Anführungszeichen oder neue Zeilen enthalten, werden gemäß CSV-Regeln in doppelte Anführungszeichen gesetzt und enthaltene Anführungszeichen werden verdoppelt.
+ *
+ * @param data - Ein Array von Objekten. Wenn `data` kein Array ist oder leer ist, wird eine leere Zeichenfolge zurückgegeben.
+ * @returns Den CSV-Text mit einer Kopfzeile aus den Objekt-Schlüsseln des ersten Elements oder eine leere Zeichenfolge, falls `data` kein nicht-leeres Array ist.
  */
 function jsonToCsv(data: any): string {
   if (!Array.isArray(data) || data.length === 0) {
@@ -210,8 +245,13 @@ function jsonToCsv(data: any): string {
 }
 
 /**
- * Simple JSONPath query implementation
- * Supports: $.store.book[*].author, $.store..price, $.*.author
+ * Führt eine vereinfachte JSONPath-ähnliche Abfrage auf einem JSON-String aus.
+ *
+ * Unterstützte Syntax: Root `$` (optional), Punkt-Notation (`a.b.c`), Wildcard `*` (für Objekte oder Arrays), Array-Indexierung `key[n]` oder `key[*]`, und rekursive Suche mit `..` (z. B. `$.store..price`).
+ *
+ * @param str - Der zu durchsuchende JSON-String
+ * @param path - Der JSONPath-Ausdruck (unterstützter Teilmengen-Syntax wie oben beschrieben)
+ * @returns Den gefundenen Wert oder `undefined`, falls der Pfad nicht aufgelöst werden kann oder kein Treffer vorliegt
  */
 export function queryJSONPath(str: string, path: string): any {
   const data = JSON.parse(str)
@@ -271,11 +311,23 @@ export function queryJSONPath(str: string, path: string): any {
 }
 
 /**
- * Recursive descent for JSONPath .. operator
+ * Sucht rekursiv in einem JSON-Objekt alle Werte, die unter einem bestimmten Schlüssel vorkommen.
+ *
+ * @param obj - Das zu durchsuchende Objekt oder Array
+ * @param key - Der Schlüsselname, nach dem gesucht werden soll
+ * @returns Ein Array mit allen gefundenen Werten für `key` (leer, wenn keine gefunden wurden)
  */
 function recursiveDescent(obj: any, key: string): any[] {
   const results: any[] = []
 
+  /**
+   * Durchsucht rekursiv einen JSON-knoten und sammelt alle Werte für das im äußeren Kontext definierte `key`.
+   *
+   * Ignoriert Nicht-Objekte; bei Arrays wird jedes Element rekursiv durchsucht, bei Objekten werden
+   * gefundene `key`-Werte in das äußere `results`-Array gepusht und alle Eigenschaftswerte weiter durchsucht.
+   *
+   * @param o - Aktueller Knoten (Objekt oder Array), der durchsucht wird
+   */
   function search(o: any): void {
     if (o === null || typeof o !== 'object') return
 

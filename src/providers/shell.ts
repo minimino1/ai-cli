@@ -9,7 +9,20 @@ export interface ShellResult {
   timedOut: boolean
 }
 
-// ─── Run Shell Command ─────────────────────────────────────────────
+/**
+ * Führt einen Prozess aus, sammelt dessen Standardausgabe und -fehler und bricht bei Überschreitung eines Zeitlimits ab.
+ *
+ * @param command - Das auszuführende Kommando oder der Pfad zur ausführbaren Datei
+ * @param args - Optionale Argumentliste für das Kommando
+ * @param timeoutMs - Maximale Ausführungsdauer in Millisekunden bevor der Prozess zwangsbeendet wird
+ * @param useShell - Wenn `true`, wird das Kommando durch die Plattform-Shell (`cmd.exe` auf Windows, `sh` sonst) ausgeführt
+ * @returns Ein Objekt mit Ausführungsinformationen:
+ * - `success`: `true` wenn `exitCode` gleich `0`, sonst `false`
+ * - `exitCode`: Numerischer Exit-Code (`-1` wenn das Kommando durch das Timeout beendet wurde)
+ * - `stdout`: Gesammelte Standardausgabe, als getrimmter String
+ * - `stderr`: Gesammelter Standardfehler, als getrimmter String
+ * - `timedOut`: `true` wenn das Kommando aufgrund des Timeouts beendet wurde, sonst `false`
+ */
 export async function runShell(
   command: string,
   args: string[] = [],

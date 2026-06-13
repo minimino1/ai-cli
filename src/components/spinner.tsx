@@ -58,7 +58,11 @@ export const Spinner: React.FC<SpinnerProps> = ({
 }
 
 /**
- * Get the character for the current frame
+ * Ermittelt das Spinner-Zeichen für einen gegebenen Stil und Frame-Index.
+ *
+ * @param style - Der Spinnerstil (z. B. 'dots', 'line', 'clock' usw.)
+ * @param frame - Der Frame-Index; wird modulo der Anzahl verfügbarer Frames behandelt
+ * @returns Das Unicode-/Emoji-Zeichen, das für den angegebenen Stil und Frame angezeigt werden soll. Bei unbekanntem Stil wird '⠋' zurückgegeben.
  */
 function getSpinnerFrame(style: SpinnerStyle, frame: number): string {
   switch (style) {
@@ -84,7 +88,10 @@ function getSpinnerFrame(style: SpinnerStyle, frame: number): string {
 }
 
 /**
- * Get total frame count for style
+ * Liefert die Anzahl der Animations-Frames für einen gegebenen Spinner-Stil.
+ *
+ * @param style - Der Spinner-Stil dessen Frame-Anzahl benötigt wird
+ * @returns Die Anzahl der Frames, die für `style` definiert sind
  */
 function getFrameCount(style: SpinnerStyle): number {
   switch (style) {
@@ -110,7 +117,20 @@ function getFrameCount(style: SpinnerStyle): number {
 }
 
 /**
- * Hook for controlling a spinner manually
+ * Bietet imperative Steuerfunktionen und Zustand für einen Spinner.
+ *
+ * Liefert Funktionen zum Starten, Stoppen und Umschalten der Animation sowie den aktuellen Aktivitätszustand
+ * und einen numerischen Frame-Zähler. Der interne Frame-Zähler wird alle 100 ms inkrementiert und läuft modulo 10.
+ * Der zurückgegebene `frame` ist ein schnappschussartiger Wert (`frameRef.current`) und wird nicht automatisch aktualisiert
+ * in Consumer-Komponenten, solange diese nicht anderweitig neu rendern.
+ *
+ * @param initialActive - Anfangszustand; `true`, wenn der Spinner direkt beim Hook-Aufruf aktiv sein soll
+ * @returns Ein Objekt mit:
+ *  - `active`: `true`, wenn der Spinner läuft, `false` sonst.
+ *  - `start()`: startet die interne Interval-Animation (wenn noch nicht gestartet).
+ *  - `stop()`: stoppt die interne Interval-Animation (wenn sie läuft).
+ *  - `toggle()`: schaltet zwischen Start und Stopp um.
+ *  - `frame`: aktuelle Frame-Nummer (0–9), als Schnappschuss des internen Zählers.
  */
 export function useSpinner(initialActive: boolean = false) {
   const [active, setActive] = useState(initialActive)

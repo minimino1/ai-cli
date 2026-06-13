@@ -285,6 +285,12 @@ export const emptyDirsCommand: Command = {
   },
 }
 
+/**
+ * Liefert eine menschenlesbare Darstellung einer Byte-Anzahl.
+ *
+ * @param bytes - Anzahl der Bytes, die formatiert werden sollen
+ * @returns Die formatierte Zahl mit Einheit (B, KB, MB, GB, TB); bei `0` wird `0 B` zurückgegeben. Die Umrechnung erfolgt auf Basis 1024 und wird mit einer Dezimalstelle gerundet.
+ */
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
   const k = 1024

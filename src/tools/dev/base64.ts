@@ -2,7 +2,10 @@
 // Uses Bun's built-in atob/btoa or Buffer
 
 /**
- * Encode string to base64 (UTF-8)
+ * Kodiert einen UTF‑8-String in Base64.
+ *
+ * @param str - Der Eingabe-String im UTF‑8-Format
+ * @returns Die Base64-kodierte Darstellung von `str`
  */
 export function encode(str: string): string {
   // Use Buffer for proper UTF-8 handling
@@ -10,7 +13,11 @@ export function encode(str: string): string {
 }
 
 /**
- * Decode base64 to UTF-8 string
+ * Wandelt einen Base64-kodierten String in einen UTF‑8-String um.
+ *
+ * @param str - Der Base64-kodierte Eingabestring.
+ * @returns Den dekodierten UTF‑8-String.
+ * @throws Error - Falls `str` kein gültiger Base64-String ist; die Fehlermeldung enthält die Originalnachricht.
  */
 export function decode(str: string): string {
   try {
@@ -21,7 +28,11 @@ export function decode(str: string): string {
 }
 
 /**
- * Encode a file to base64
+ * Konvertiert eine Datei auf dem Dateisystem in eine Base64-kodierte Zeichenkette.
+ *
+ * @param path - Pfad zur zu lesenden Datei
+ * @returns Die Base64-kodierte Darstellung des Dateiinhalts
+ * @throws Error Wenn die Datei nicht gelesen werden kann; die Fehlermeldung enthält den Pfad und die ursprüngliche Fehlermeldung
  */
 export async function encodeFile(path: string): Promise<string> {
   try {
@@ -35,7 +46,12 @@ export async function encodeFile(path: string): Promise<string> {
 }
 
 /**
- * Decode base64 to file
+ * Schreibt die aus einer Base64-kodierten Zeichenkette dekodierten Bytes in eine Datei.
+ *
+ * @param base64 - Base64-kodierte Daten, die in die Datei geschrieben werden sollen
+ * @param outputPath - Zieldateipfad, unter dem die dekodierten Bytes abgelegt werden
+ * @returns Eine Statusmeldung im Format `Wrote <byteLength> bytes to <outputPath>`
+ * @throws Error wenn das Dekodieren oder Schreiben fehlschlägt; die Fehlermeldung beginnt mit `Could not write file <outputPath>:`
  */
 export async function decodeFile(base64: string, outputPath: string): Promise<string> {
   try {
@@ -48,7 +64,12 @@ export async function decodeFile(base64: string, outputPath: string): Promise<st
 }
 
 /**
- * Check if a string is valid base64
+ * Prüft, ob eine Zeichenkette gültige Base64-kodierte Daten darstellt.
+ *
+ * Führt eine formale Musterprüfung und einen Dekodier-Versuch durch, um ungültige Eingaben auszuschließen.
+ *
+ * @param str - Die zu prüfende Zeichenkette
+ * @returns `true` wenn `str` gültiges Base64 ist, `false` sonst
  */
 export function isBase64(str: string): boolean {
   // Base64 regex (standard and URL-safe)
@@ -66,14 +87,22 @@ export function isBase64(str: string): boolean {
 }
 
 /**
- * Encode to base64 URL-safe variant (replace +/ with -_)
+ * Konvertiert einen UTF-8-String in eine URL-sichere Base64-Darstellung.
+ *
+ * @param str - Eingabetext, der in Base64 kodiert werden soll
+ * @returns Die Base64-codierte, URL-sichere Darstellung von `str` ohne '='-Padding
  */
 export function encodeURLSafe(str: string): string {
   return encode(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
 /**
- * Decode base64 URL-safe variant
+ * Wandelt eine URL-sichere Base64-Zeichenkette in die ursprüngliche UTF‑8-Zeichenkette um.
+ *
+ * Vor der Dekodierung werden URL-sichere Zeichen (`-`, `_`) in Standard-Base64-Zeichen (`+`, `/`) zurückgewandelt und bei Bedarf das fehlende `=`-Padding ergänzt.
+ *
+ * @param str - Die Eingabe im URL-sicheren Base64-Format (optionale Padding-Entfernung möglich)
+ * @returns Die decodierte UTF‑8-Zeichenkette
  */
 export function decodeURLSafe(str: string): string {
   // Replace URL-safe chars back to standard base64 and pad

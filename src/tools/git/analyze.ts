@@ -55,7 +55,12 @@ const colors = {
   dim: '\x1b[2m',
 }
 
-// ─── Run Git Command ───────────────────────────────────────────────
+/**
+ * Führt das `git`-Kommando mit den gegebenen Argumenten im aktuellen Arbeitsverzeichnis aus und sammelt dessen Ausgabe.
+ *
+ * @param args - Array von Argumenten, die an `git` übergeben werden (z. B. `['status', '--porcelain']`)
+ * @returns Ein `GitResult`-Objekt mit `success` (true wenn der Prozess-Exit-Code 0 war), `exitCode` sowie den getrimmten `stdout`- und `stderr`-Inhalten
+ */
 async function runGit(args: string[]): Promise<GitResult> {
   const subprocess = Bun.spawn({
     program: 'git',
@@ -101,7 +106,12 @@ async function runGit(args: string[]): Promise<GitResult> {
   return { success: exitCode === 0, exitCode, stdout: stdout.trim(), stderr: stderr.trim() }
 }
 
-// ─── Count Lines in File ────────────────────────────────────────────
+/**
+ * Ermittelt die Anzahl der Zeilen in einer Textdatei.
+ *
+ * @param filePath - Pfad zur Datei, deren Zeilen gezählt werden sollen
+ * @returns Die Anzahl der Zeilen in der Datei; `0` bei Lesefehlern oder wenn die Datei nicht existiert
+ */
 async function countLines(filePath: string): Promise<number> {
   try {
     const content = await Bun.file(filePath).text()
@@ -113,7 +123,12 @@ async function countLines(filePath: string): Promise<number> {
 
 // ─── Repository Statistics ──────────────────────────────────────────
 /**
- * Get overall repository statistics
+ * Erstellt einen formatierten Bericht mit zentralen Kennzahlen des Git-Repositorys.
+ *
+ * Fügt Gesamtanzahl der Commits, Anzahl der Branches und Anzahl der Mitwirkenden hinzu.
+ * Falls verfügbar, werden außerdem Datum und Autor des ersten und letzten Commits sowie das Alter des Repositories in Tagen angefügt; diese Abschnitte erscheinen nur, wenn die jeweiligen Git-Abfragen erfolgreich sind.
+ *
+ * @returns Ein mehrzeiliges, formatiertes String-Report mit den aggregierten Repository-Statistiken
  */
 export async function repoStats(): Promise<string> {
   const results: string[] = []
@@ -165,7 +180,11 @@ export async function repoStats(): Promise<string> {
 
 // ─── Contributor Statistics ─────────────────────────────────────────
 /**
- * Get statistics per contributor
+ * Erzeugt eine formatierte Übersicht der Commit-Statistiken pro Contributor.
+ *
+ * Berechnet Commit-Anzahlen und Prozentanteile pro Autor, ermittelt das Datum des letzten Commits pro Autor und gibt eine farbcodierte, tabellarische Textausgabe zurück.
+ *
+ * @returns Eine farbcodierte, tabellarische Übersicht der Autoren, deren Commit‑Anzahlen, Prozentanteile und des Datums des letzten Commits; im Fehlerfall enthält der String eine Fehlermeldung. 
  */
 export async function contributorStats(): Promise<string> {
   const result = await runGit(['shortlog', '-sne', '--all'])
@@ -228,7 +247,12 @@ export async function contributorStats(): Promise<string> {
 
 // ─── File Hotspots ──────────────────────────────────────────────────
 /**
- * Find most changed files (hotspots)
+ * Ermittelt die Top n Dateien mit den meisten Einträgen in der Git-Historie (Hotspots).
+ *
+ * Liefert für jede Datei die Anzahl der Commits, die Anzahl eindeutiger Autoren und das Datum der letzten Änderung.
+ *
+ * @param n - Maximale Anzahl der angezeigten Dateien (Standard: 10)
+ * @returns Den formatierten, farbcodierten Berichtstext mit Spalten für Datei, Commits, Autoren und letztes Änderungsdatum. Bei Git-Fehlern enthält der Text eine entsprechende Fehlermeldung.
  */
 export async function fileHotspots(n: number = 10): Promise<string> {
   // Get commit count per file
@@ -291,8 +315,13 @@ export async function fileHotspots(n: number = 10): Promise<string> {
 
 // ─── Branch Health ──────────────────────────────────────────────────
 /**
- * Check branch health (ahead/behind)
- */
+ * Ermittelt den Ahead-/Behind-Status aller lokalen Branches und erzeugt einen formatierten Bericht.
+ *
+ * Gibt einen farbcodierten, zeilenweisen Bericht zurück, der den aktuellen Branch, für jeden Branch den
+ * Status (`healthy`, `ahead`, `behind`, `diverged`) sowie die Anzahl der Commits `ahead` und `behind` anzeigt.
+ *
+ * @returns Der formatierte Bericht als `string`. Bei Fehlern von Git oder wenn HEAD detached ist, enthält der
+ *          zurückgegebene String eine entsprechende Fehler- oder Hinweismeldung.
 export async function branchHealth(): Promise<string> {
   // Get current branch
   const currentBranchResult = await runGit(['branch', '--show-current'])
@@ -352,7 +381,10 @@ export async function branchHealth(): Promise<string> {
 
 // ─── Recent Activity ────────────────────────────────────────────────
 /**
- * Get recent activity summary
+ * Liefert eine kurze, formatierte Zusammenfassung der Repository-Aktivität der letzten Tage.
+ *
+ * @param days - Anzahl der zurückliegenden Tage, die in die Zusammenfassung einbezogen werden
+ * @returns Eine farbcodierte Textzusammenfassung mit Anzahl der Commits, eindeutigen Mitwirkenden, geänderten Dateien und neu erstellten Branches
  */
 export async function recentActivity(days: number = 7): Promise<string> {
   const since = `${days} days ago`
@@ -390,8 +422,13 @@ export async function recentActivity(days: number = 7): Promise<string> {
 
 // ─── Code Ownership (Lines per Author) ──────────────────────────────
 /**
- * Estimate code ownership by author (lines per author)
- * Note: This is an approximation based on blame
+ * Schätzt die Code-Besitzanteile pro Autor anhand von `git blame`.
+ *
+ * Führt ein stichprobenartiges Blame über bis zu 50 Quelltextdateien aus und erstellt einen formatierten Bericht,
+ * der für jeden Autor die Anzahl der ermittelten Codezeilen und den prozentualen Anteil am gezählten Gesamtumfang zeigt.
+ *
+ * @returns Ein formatierter Bericht als String mit Gesamtzeilen, Auflistung der Autoren, deren Zeilenanzahl und Prozentanteil;
+ *          bei fehlenden Quelldateien oder wenn keine Zeilen gezählt werden konnten, wird eine erklärende Meldung zurückgegeben.
  */
 export async function codeOwnership(): Promise<string> {
   // Get all source files (common extensions)

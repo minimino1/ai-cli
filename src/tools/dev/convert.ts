@@ -78,7 +78,13 @@ const timeUnits: Record<string, ConversionRate> = {
 }
 
 /**
- * Main conversion function
+ * Konvertiert einen numerischen Wert zwischen zwei unterstützten Einheiten derselben Kategorie.
+ *
+ * @param value - Der Wert in der Ausgangseinheit
+ * @param from - Ausgangseinheit (Symbol), z. B. "m", "kg", "c"; Groß-/Kleinschreibung wird ignoriert
+ * @param to - Ziel­einheit (Symbol); Groß-/Kleinschreibung wird ignoriert
+ * @returns Der Wert ausgedrückt in der Ziel­einheit
+ * @throws {Error} Wenn weder `from` noch `to` zu einer unterstützten Kategorie gehören oder wenn eine der Einheiten in der ermittelten Kategorie nicht unterstützt wird
  */
 export function convert(value: number, from: string, to: string): number {
   const normalizedFrom = from.toLowerCase()
@@ -123,7 +129,14 @@ export function convert(value: number, from: string, to: string): number {
 }
 
 /**
- * Get available units for a category
+ * Liefert die unterstützten Einheitensymbole für eine bestimmte Kategorie oder für alle Kategorien.
+ *
+ * Wenn `category` angegeben ist (Groß-/Kleinschreibung wird ignoriert), werden die Einheitenschlüssel
+ * dieser Kategorie zurückgegeben; ist die Kategorie unbekannt, wird ein leeres Array geliefert.
+ * Wird `category` weggelassen, werden die Einheitenschlüssel aller Kategorien flach zusammengeführt zurückgegeben.
+ *
+ * @param category - Optionaler Kategoriename (z. B. "length", "weight", "temperature", "data", "time"); Groß-/Kleinschreibung wird ignoriert
+ * @returns Eine Liste von Einheitenschlüsseln: die Einheiten der angegebenen Kategorie oder, falls keine Kategorie angegeben wurde, alle Einheiten über alle Kategorien hinweg; ein leeres Array, wenn die angegebene Kategorie nicht existiert
  */
 export function getUnits(category?: string): string[] {
   const allUnits = {
@@ -143,7 +156,13 @@ export function getUnits(category?: string): string[] {
 }
 
 /**
- * Format converted value with appropriate precision
+ * Gibt eine formatierte Darstellung eines numerischen Ergebnisses mit passender Genauigkeit zurück.
+ *
+ * Bei sehr großen oder sehr kleinen Beträgen wird Exponentialnotation verwendet, sonst eine gerundete Dezimaldarstellung.
+ *
+ * @param value - Der zu formatierende numerische Wert
+ * @param precision - Anzahl der Dezimalstellen für die Rundung bzw. Stellen für die Exponentialnotation (Standard: 6)
+ * @returns Die formatierte Zahl als String
  */
 export function formatConverted(value: number, precision: number = 6): string {
   // Use scientific notation for very large/small numbers

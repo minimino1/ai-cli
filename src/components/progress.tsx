@@ -169,7 +169,18 @@ export const MultiProgress: React.FC<MultiProgressProps> = ({
 }
 
 /**
- * Hook for managing progress state
+ * Verwaltet den Fortschrittszustand für eine zählbare Aufgabe.
+ *
+ * @param total - Gesamtanzahl der zu verarbeitenden Einheiten
+ * @returns Ein Objekt mit dem aktuellen Fortschritt und Steuerfunktionen:
+ *  - `completed` — Anzahl bereits abgeschlossener Einheiten
+ *  - `percent` — Fortschritt in Prozent (0–100)
+ *  - `eta` — Geschätzte verbleibende Zeit in Sekunden oder `undefined`, wenn nicht berechenbar
+ *  - `increment` — Funktion, die den Fortschritt um einen angegebenen Betrag (Standard: 1) erhöht; Ergebnis wird auf `[0, total]` begrenzt
+ *  - `setProgress` — Setzt `completed` auf einen Wert, der auf `[0, total]` begrenzt wird
+ *  - `reset` — Setzt `completed` auf `0`
+ *  - `complete` — Setzt `completed` auf `total`
+ *  - `isComplete` — `true`, wenn `completed >= total`
  */
 export function useProgress(total: number) {
   const [completed, setCompleted] = useState(0)

@@ -2,7 +2,14 @@
 
 import type { Theme } from '../theme.js'
 
-// Color palette helper
+/**
+ * Erstellt einen Hex-Farbstring im Format `#RRGGBB` aus einzelnen RGB-Komponenten.
+ *
+ * @param r - Rotkomponente (0–255)
+ * @param g - Grünkomponente (0–255)
+ * @param b - Blaukomponente (0–255)
+ * @returns Den Hex-Farbstring im Format `#RRGGBB`, der die übergebenen RGB-Werte repräsentiert
+ */
 function hex(r: number, g: number, b: number): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
 }

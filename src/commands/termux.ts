@@ -6,7 +6,11 @@ import * as termuxSetup from '../tools/termux/setup'
 import * as termuxClipboard from '../tools/termux/clipboard'
 import type { Command } from '../types'
 
-// ─── Helper: Check Termux ──────────────────────────────────────────────
+/**
+ * Prüft, ob die aktuelle Umgebung Termux ist.
+ *
+ * @returns `{ valid: boolean; message: string }` — `valid` ist `true`, wenn Termux erkannt wurde; `message` enthält bei `valid === false` die Benutzerfehlermeldung, ansonsten einen leeren String.
+ */
 function ensureTermux(): { valid: boolean; message: string } {
   const status = termuxDetect.detectTermux()
   if (!status.isTermux) {

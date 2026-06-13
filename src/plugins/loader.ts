@@ -21,7 +21,12 @@ const pluginFiles = new Map<string, string>() // file path -> plugin name
 const watchers = new Map<string, { close: () => void }>()
 const enabledPlugins = new Set<string>()
 
-// ─── Load Plugin from File ────────────────────────────────────────────
+/**
+ * Lädt ein Plugin-Modul von der angegebenen Datei und validiert, dass es ein Manifest mit `name` enthält.
+ *
+ * @param filePath - Pfad zur Plugin-Datei (z. B. absolute oder relative Pfadangabe zur .js/.ts-Datei)
+ * @returns `{ success: true, plugin }` bei erfolgreichem Laden und Validierung; `{ success: false, error }` mit einer aussagekräftigen Fehlermeldung sonst
+ */
 async function loadPluginFromFile(filePath: string): Promise<PluginLoadResult> {
   try {
     // Dynamic import the plugin module
@@ -78,7 +83,13 @@ async function loadPluginFromFile(filePath: string): Promise<PluginLoadResult> {
   }
 }
 
-// ─── Initialize Plugin ───────────────────────────────────────────────
+/**
+ * Initialisiert ein geladenes Plugin: erstellt seinen Kontext, registriert Befehle, führt das optionale `onLoad` aus und speichert den Loader-Status.
+ *
+ * @param plugin - Das Plugin-Objekt; sein `manifest.name` wird als eindeutiger Plugin-Name verwendet.
+ * @param filePath - Pfad zur Plugin-Quelldatei, wird zur Zuordnung und für späteres Neuladen gespeichert.
+ * @returns Bei Erfolg `{ success: true, plugin }`; bei Fehler `{ success: false, error }` mit einer beschreibenden Fehlermeldung.
+ */
 async function initializePlugin(plugin: Plugin, filePath: string): Promise<PluginLoadResult> {
   const { manifest, commands = [], onLoad } = plugin
   const pluginName = manifest.name
@@ -131,7 +142,12 @@ async function initializePlugin(plugin: Plugin, filePath: string): Promise<Plugi
   }
 }
 
-// ─── Unload Plugin ────────────────────────────────────────────────────
+/**
+ * Lädt ein Plugin ab und entfernt alle zugehörigen Ressourcen (Kontext, Befehle, Zuordnungen).
+ *
+ * @param pluginName - Der Name des Plugins wie in seinem Manifest
+ * @returns `true` wenn das Plugin erfolgreich entladen wurde, `false` andernfalls
+ */
 async function unloadPlugin(pluginName: string): Promise<boolean> {
   const plugin = loadedPlugins.get(pluginName)
   const context = pluginContexts.get(pluginName)
@@ -179,7 +195,16 @@ async function unloadPlugin(pluginName: string): Promise<boolean> {
   }
 }
 
-// ─── Scan Plugins Directory ───────────────────────────────────────────
+/**
+ * Durchsucht das Plugins-Verzeichnis und erstellt eine Liste verfügbarer Plugin-Einträge.
+ *
+ * Liefert für jede erkannte Plugin-Datei einen Eintrag mit Name, Pfad, Aktivierungsstatus,
+ * optionalem manifest (falls aus der Datei erkannt) und Ladezustand. Es werden nur Dateien
+ * mit den Endungen `.ts`, `.js`, `.mjs` und `.cjs` berücksichtigt.
+ *
+ * @returns Eine Liste von `PluginDirectoryEntry`-Objekten; bei einem Fehler beim Lesen des Verzeichnisses
+ *          oder der Dateien wird ein leeres Array zurückgegeben.
+ */
 async function scanPluginsDirectory(): Promise<PluginDirectoryEntry[]> {
   const fs = await import('node:fs/promises')
   const path = await import('node:path')
@@ -231,7 +256,13 @@ async function scanPluginsDirectory(): Promise<PluginDirectoryEntry[]> {
   }
 }
 
-// ─── Load All Plugins ────────────────────────────────────────────────
+/**
+ * Scannt das Plugin-Verzeichnis und versucht, alle als aktiviert markierten Plugins zu laden.
+ *
+ * Führt für jede gefundene, aktivierte Plugin-Datei einen Ladevorgang durch und sammelt die jeweiligen Ergebnisse.
+ *
+ * @returns Ein Array von `PluginLoadResult`-Einträgen mit dem Ergebnis für jedes versuchte Plugin, in der Reihenfolge des Scan-Vorgangs.
+ */
 export async function loadAllPlugins(): Promise<PluginLoadResult[]> {
   const results: PluginLoadResult[] = []
 
@@ -256,7 +287,12 @@ export async function loadAllPlugins(): Promise<PluginLoadResult[]> {
   }
 }
 
-// ─── Load Single Plugin ───────────────────────────────────────────────
+/**
+ * Lädt ein Plugin-Modul von der angegebenen Datei, initialisiert es und ersetzt bei Bedarf eine bereits geladene Version.
+ *
+ * @param filePath - Dateisystempfad zur Plugin-Datei
+ * @returns Ein Objekt mit dem Ladeergebnis; bei Erfolg (`success: true`) enthält es das initialisierte Plugin unter `plugin`, bei Fehlern enthält es eine `error`-Beschreibung und `success: false`.
+ */
 export async function loadPlugin(filePath: string): Promise<PluginLoadResult> {
   const result = await loadPluginFromFile(filePath)
 
@@ -275,12 +311,22 @@ export async function loadPlugin(filePath: string): Promise<PluginLoadResult> {
   return await initializePlugin(result.plugin, filePath)
 }
 
-// ─── Unload Plugin by Name ────────────────────────────────────────────
+/**
+ * Entfernt das geladenen Plugin mit dem angegebenen Namen aus dem Laufzeitzustand.
+ *
+ * @param pluginName - Der Name des zu entfernenden Plugins
+ * @returns `true` wenn das Plugin erfolgreich entladen wurde, `false` andernfalls
+ */
 export async function unloadPluginByName(pluginName: string): Promise<boolean> {
   return await unloadPlugin(pluginName)
 }
 
-// ─── Reload Plugin ────────────────────────────────────────────────────
+/**
+ * Lädt ein bereits geladenes Plugin neu.
+ *
+ * @param pluginName - Der in `manifest.name` definierte Name des Plugins
+ * @returns Ein Objekt mit dem Ladeergebnis; bei Erfolg enthält es das geladene `plugin`, sonst ein `error`-Feld mit einer Fehlermeldung
+ */
 export async function reloadPlugin(pluginName: string): Promise<PluginLoadResult> {
   const plugin = loadedPlugins.get(pluginName)
   if (!plugin) {
@@ -311,7 +357,11 @@ export async function reloadPlugin(pluginName: string): Promise<PluginLoadResult
   return await loadPlugin(filePath)
 }
 
-// ─── Reload All Plugins ───────────────────────────────────────────────
+/**
+ * Lädt alle aktuell geladenen Plugins neu.
+ *
+ * @returns Ein Array von PluginLoadResult-Objekten — eines pro Plugin, in der Reihenfolge der zuvor geladenen Plugins.
+ */
 export async function reloadAllPlugins(): Promise<PluginLoadResult[]> {
   const results: PluginLoadResult[] = []
   const pluginNames = Array.from(loadedPlugins.keys())
@@ -324,7 +374,12 @@ export async function reloadAllPlugins(): Promise<PluginLoadResult[]> {
   return results
 }
 
-// ─── Enable Plugin ────────────────────────────────────────────────────
+/**
+ * Aktiviert ein Plugin und lädt es aus dem Plugins-Verzeichnis, falls eine passende Datei vorhanden ist.
+ *
+ * @param pluginName - Der Name des Plugins wie in dessen Manifest (`manifest.name`)
+ * @returns `true` wenn das Plugin nach dem Aktivieren erfolgreich geladen wurde, `false` sonst.
+ */
 export async function enablePlugin(pluginName: string): Promise<boolean> {
   enabledPlugins.add(pluginName)
 
@@ -340,14 +395,23 @@ export async function enablePlugin(pluginName: string): Promise<boolean> {
   return false
 }
 
-// ─── Disable Plugin ───────────────────────────────────────────────────
+/**
+ * Deaktiviert ein Plugin und entfernt seinen Namen aus der Menge aktivierter Plugins.
+ *
+ * @param pluginName - Der Name des zu deaktivierenden Plugins
+ * @returns `true`, wenn das Plugin erfolgreich entladen wurde, `false` andernfalls
+ */
 export async function disablePlugin(pluginName: string): Promise<boolean> {
   const unloaded = await unloadPlugin(pluginName)
   enabledPlugins.delete(pluginName)
   return unloaded
 }
 
-// ─── Get Plugin Info ──────────────────────────────────────────────────
+/**
+ * Liefert Metadaten zu einem aktuell geladenen Plugin.
+ *
+ * @returns Ein `PluginDirectoryEntry` mit `name`, `enabled`, `manifest` und `loaded: true` für das geladene Plugin; `null` wenn kein Plugin mit `pluginName` geladen ist. Das Feld `path` ist absichtlich leer und muss aus `pluginFiles` ermittelt werden.
+ */
 export function getPluginInfo(pluginName: string): PluginDirectoryEntry | null {
   const plugin = loadedPlugins.get(pluginName)
   if (!plugin) return null
@@ -361,7 +425,11 @@ export function getPluginInfo(pluginName: string): PluginDirectoryEntry | null {
   }
 }
 
-// ─── List Loaded Plugins ──────────────────────────────────────────────
+/**
+ * Gibt eine Liste aller aktuell geladenen Plugins mit Pfad, Aktivierungsstatus und Manifest zurück.
+ *
+ * @returns Ein Array von PluginDirectoryEntry — für jedes geladene Plugin enthält der Eintrag `name`, `path` (Dateipfad oder leer), `enabled` (`true`/`false`), `manifest` und `loaded: true`.
+ */
 export function listLoadedPlugins(): PluginDirectoryEntry[] {
   const entries: PluginDirectoryEntry[] = []
 
@@ -386,17 +454,32 @@ export function listLoadedPlugins(): PluginDirectoryEntry[] {
   return entries
 }
 
-// ─── Get Plugin Context ───────────────────────────────────────────────
+/**
+ * Gibt den Plugin-Kontext für das angegebene Plugin zurück.
+ *
+ * @returns Den zugehörigen `PluginContext`, oder `undefined`, wenn das Plugin nicht geladen ist.
+ */
 export function getPluginContext(pluginName: string): PluginContext | undefined {
   return pluginContexts.get(pluginName)
 }
 
-// ─── Get All Plugin Commands ──────────────────────────────────────────
+/**
+ * Liefert eine Map aller aktuell registrierten Plugin-Befehle.
+ *
+ * @returns Eine Map (`Map<string, PluginCommand>`) von Befehlsnamen zu `PluginCommand`-Objekten für alle registrierten Plugin-Befehle
+ */
 export function getAllPluginCommands(): Map<string, PluginCommand> {
   return getPluginCommands()
 }
 
-// ─── File Watcher Setup ───────────────────────────────────────────────
+/**
+ * Erstellt einen Dateisystem-Watcher für eine Plugin-Datei und löst bei Änderungen einen Plugin-Neuladevorgang aus.
+ *
+ * Registriert einen Watcher für `filePath` (sofern noch keiner existiert) und speichert dessen Schließfunktion in der internen `watchers`-Map. Bei einer Dateiänderung wird `reloadPlugin(pluginName)` aufgerufen; wenn das Betriebssystem oder die Laufzeit kein File-Watching unterstützt, wird die Einrichtung stillschweigend abgebrochen.
+ *
+ * @param filePath - Absoluter Pfad zur Plugin-Datei, die überwacht werden soll
+ * @param pluginName - Name des Plugins, das beim Erkennen von Änderungen neu geladen werden soll
+ */
 function setupFileWatcher(filePath: string, pluginName: string): void {
   if (watchers.has(filePath)) {
     return
@@ -422,7 +505,14 @@ function setupFileWatcher(filePath: string, pluginName: string): void {
   }
 }
 
-// ─── Start Watching Plugins Directory ─────────────────────────────────
+/**
+ * Überwacht das Plugins-Verzeichnis und reagiert auf Dateiänderungen und Umbenennungen.
+ *
+ * Bei Dateiänderungen (.ts, .js, .mjs, .cjs) löst die Funktion für die betroffene Plugin-Datei
+ * ein Neuladen des zugeordneten Plugins aus; bei Umbenennungen startet sie einen vollständigen
+ * Neuabgleich (Rescan) aller Plugins. Sie legt einen Dateisystem-Watcher unter dem Schlüssel
+ * 'plugins-dir' ab und protokolliert, falls das Watchen nicht verfügbar ist.
+ */
 export function startWatching(): void {
   import('node:fs').then(({ watch }) => {
     import('node:path').then(({ join, extname }) => {
@@ -466,7 +556,11 @@ export function startWatching(): void {
   })
 }
 
-// ─── Stop Watching ────────────────────────────────────────────────────
+/**
+ * Beendet alle aktiven Datei-/Verzeichnis-Watcher des Plugin-Loaders.
+ *
+ * Versucht, jeden registrierten Watcher zu schließen; schlägt das Schließen eines Watchers fehl, wird eine Warnung ausgegeben. Entfernt danach alle Einträge aus der internen Watcher-Sammlung.
+ */
 export function stopWatching(): void {
   for (const [key, watcher] of watchers.entries()) {
     try {
@@ -478,7 +572,11 @@ export function stopWatching(): void {
   watchers.clear()
 }
 
-// ─── Cleanup ─────────────────────────────────────────────────────────
+/**
+ * Räumt den Plugin-Loader vollständig auf und setzt seinen internen Zustand zurück.
+ *
+ * Stoppt laufende Dateiwatcher, entfernt alle registrierten Plugin-Befehle und leert die internen Sammlungen für geladene Plugins, Plugin-Kontexte, Datei-Zuordnungen und aktivierte Plugins. Nach dem Aufruf sind keine Plugins geladen und keine Watcher aktiv.
+ */
 export function cleanup(): void {
   stopWatching()
   clearPluginCommands()

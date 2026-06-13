@@ -25,7 +25,15 @@ export interface TableProps<T> {
 }
 
 /**
- * Table component for TUI with borders and sorting
+ * Rendert eine TUI-Tabelle mit optionalen Rahmen, Spalten-Sortierung, gestreiften und hervorgehobenen Zeilen sowie anpassbaren Spalten.
+ *
+ * Die Spaltenbreiten passen sich an Header- und Zellinhalte an; sortierbare Spalten zeigen Sortierindikatoren im Header.
+ *
+ * @param columns - Spaltendefinitionen (`Column<T>`) zur Steuerung von Header, Ausrichtung, optionaler Renderer und Sortierbarkeit
+ * @param rows - Zeilendaten als Array von `T`
+ * @param options - Anzeige- und Verhaltensoptionen (z. B. `border`, `padding`, `showHeader`, `sortable`, `striped`, `highlightRow`)
+ * @param onSort - Optionaler Callback, der beim Umschalten einer sortierbaren Spalte aufgerufen wird; erhält `(key, direction)` wobei `direction` `'asc'` oder `'desc'` ist
+ * @returns Das gerenderte Ink-Element, das die vollständige Tabelle enthält
  */
 export function Table<T extends Record<string, unknown>>({
   columns,
@@ -252,7 +260,11 @@ export function Table<T extends Record<string, unknown>>({
 }
 
 /**
- * Helper to get value from row by key (supports nested keys with dot notation)
+ * Liefert den Wert für einen angegebenen Schlüssel aus einer Zeile und unterstützt verschachtelte Pfade in Punktnotation.
+ *
+ * @param row - Die Zeile (Objekt), aus der der Wert gelesen wird
+ * @param key - Ein Schlüssel oder ein verschachtelter Pfad (z. B. `user.name`)
+ * @returns Den gefundenen Wert oder `undefined`, wenn der Schlüssel bzw. Pfad nicht existiert
  */
 function getValue<T extends Record<string, unknown>>(row: T, key: keyof T | string): unknown {
   const keyStr = String(key)
@@ -287,6 +299,17 @@ export interface SimpleTableProps {
   }
 }
 
+/**
+ * Rendert eine einfache, zeilenbasierte Tabelle für String-Zellen mit optionalen Rahmen-, Padding- und Ausrichtungsoptionen.
+ *
+ * @param headers - Array von Spaltenüberschriften in der angezeigten Reihenfolge.
+ * @param rows - 2D-Array mit Zeilen; jede Zeile ist ein Array von Zellen als Strings, Reihenfolge entspricht `headers`.
+ * @param options - Konfigurationsobjekt:
+ *   - `border` (default `true`) — Rahmen um die Tabelle und Zwischenlinien anzeigen.
+ *   - `padding` (default `1`) — Anzahl Leerzeichen links/rechts jeder Zelle.
+ *   - `align` — Optionales Array mit Ausrichtungen (`'left' | 'center' | 'right'`) pro Spalte.
+ * @returns Das gerenderte Ink-Element, das die Tabelle enthält.
+ */
 export function SimpleTable({ headers, rows, options = {} }: SimpleTableProps) {
   const { border = true, padding = 1, align = [] } = options
 

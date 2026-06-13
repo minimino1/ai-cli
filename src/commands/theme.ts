@@ -218,7 +218,11 @@ export const themeCommands: Command[] = [
   },
 ]
 
-// ─── Initialize Theme System ───────────────────────────────────────────
+/**
+ * Initialisiert den Theme-Manager und bereitet die Theme-Befehle zur Nutzung vor.
+ *
+ * Stellt sicher, dass das Theme-Subsystem eingerichtet ist, bevor die Theme-Kommandos verwendet werden.
+ */
 export async function initializeThemeCommands(): Promise<void> {
   await initializeThemeManager()
   console.log('[ThemeCommands] Theme commands initialized')

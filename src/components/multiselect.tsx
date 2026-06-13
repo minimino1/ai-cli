@@ -27,7 +27,23 @@ export interface MultiSelectProps<T> {
 }
 
 /**
- * Multi-select component with checkbox list
+ * Rendert eine interaktive Mehrfachauswahl-UI mit Filterung, Tastaturnavigation und Bestätigungsbildschirm.
+ *
+ * Unterstützt Suche (eingabetextbasiert), Navigation mit Pfeiltasten, Umschalten der Auswahl mit Leertaste,
+ * optionales Auswählen aller/Leeren der sichtbaren Einträge (`a` / `c`), sowie Bestätigen/Abbrechen (Enter / Esc).
+ *
+ * @param items - Die Liste aller Einträge, die zur Auswahl angezeigt werden sollen.
+ * @param getLabel - Liefert das Anzeigetext-Label für einen Eintrag.
+ * @param getKey - Liefert den eindeutigen Schlüssel für einen Eintrag; Standard ist `String(item)`.
+ * @param defaultSelected - Anfangs ausgewählte Einträge; Elemente dieser Liste werden via `getKey` in die Auswahl übernommen.
+ * @param onChange - Wird aufgerufen, wenn sich die Auswahl ändert; erhält die aktuell ausgewählten Items.
+ * @param onConfirm - Wird aufgerufen, wenn der Benutzer die Auswahl bestätigt (Enter) und erhält die ausgewählten Items.
+ * @param onCancel - Wird aufgerufen, wenn der Benutzer den Vorgang abbricht (Esc).
+ * @param placeholder - Titel/Überschrift der Auswahlansicht.
+ * @param showSelectAll - Wenn `true`, werden die Tastaturkürzel `a` (alles auswählen) und `c` (alles leeren) aktiviert.
+ * @param searchPlaceholder - Platzhaltertext für die Suchzeile.
+ * @param visibleItems - Anzahl der gleichzeitig sichtbaren Listeneinträge im Fenster (Scroll-Fensterhöhe).
+ * @returns Das gerenderte React-Element der Mehrfachauswahl-Komponente.
  */
 export function MultiSelect<T>({
   items,
@@ -209,7 +225,23 @@ export function MultiSelect<T>({
 }
 
 /**
- * Hook for multi-select state management
+ * Verwalte eine Menge ausgewählter Elemente und stelle Hilfsfunktionen zum Ändern und Abfragen der Auswahl bereit.
+ *
+ * Verwaltet intern eine `Set<string>` von Schlüsseln (abgeleitet durch `getKey`) und bietet Utilities zum
+ * Umschalten, (de-)selektieren, alle auswählen, löschen sowie zur Abfrage der aktuell ausgewählten Items.
+ *
+ * @param items - Die komplette Liste der verfügbaren Elemente; wird zur Berechnung von `selectedItems` verwendet.
+ * @param getKey - Funktion, die aus einem Element dessen eindeutigen Schlüssel (`string`) erzeugt.
+ * @returns Ein Objekt mit:
+ *  - `selected`: die Menge aktueller Schlüssel (`Set<string>`)
+ *  - `selectedItems`: die Elemente aus `items`, deren Schlüssel in `selected` enthalten sind
+ *  - `toggle(item)`: schaltet den Selektionsstatus von `item`
+ *  - `select(item)`: fügt `item` zur Auswahl hinzu
+ *  - `deselect(item)`: entfernt `item` aus der Auswahl
+ *  - `selectAll(itemsToSelect)`: ersetzt die Auswahl durch die Schlüssel von `itemsToSelect`
+ *  - `clear()`: leert die Auswahl
+ *  - `isSelected(item)`: prüft, ob `item` aktuell ausgewählt ist
+ *  - `setSelected`: direkter Setter für die `selected`-Menge
  */
 export function useMultiSelect<T>(items: T[], getKey: (item: T) => string) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -284,6 +316,16 @@ export interface CheckboxListProps<T> {
   onFocusChange: (index: number) => void
 }
 
+/**
+ * Rendert eine Spalte von Einträgen mit Checkbox-Indikator, Fokus-Hervorhebung und Label.
+ *
+ * @param items - Die anzuzeigenden Elemente.
+ * @param getLabel - Liefert die darzustellende Bezeichnung für ein Element.
+ * @param getKey - Liefert den eindeutigen Schlüssel für ein Element; standardmäßig `String(item)`.
+ * @param selected - Menge von Schlüsseln, die als ausgewählt gelten.
+ * @param focusedIndex - Index des aktuell fokussierten Eintrags (wird hervorgehoben).
+ * @returns Ein JSX-Element mit den gerenderten Checkbox-Zeilen.
+ */
 export function CheckboxList<T>({
   items,
   getLabel,

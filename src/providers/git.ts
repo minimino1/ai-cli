@@ -205,7 +205,17 @@ export async function gitCommit(message: string): Promise<string> {
   return `${colors.green}✓ Committed changes${colors.reset}\n${result.stdout}`
 }
 
-// ─── Git Branch ─────────────────────────────────────────────────────
+/**
+ * Liefert die Liste aller lokalen und entfernten Git-Branches und markiert den aktuellen Branch farbig.
+ *
+ * Führt `git branch -a --list --color=always` aus. Bei einem fehlgeschlagenen Aufruf enthält die Rückgabe
+ * eine Fehlerzeile mit `Error:` gefolgt von der farbcodierten Fehlermeldung; ist die Ausgabe leer, wird
+ * eine farbige Meldung angezeigt, dass keine Branches gefunden wurden.
+ *
+ * @returns Eine formatierte, ggf. mehrzeilige Zeichenkette mit farbcodierten Branch-Zeilen. Im Fehlerfall enthält
+ *          die Zeichenkette `Error:` gefolgt von der farbcodierten stderr-Ausgabe; bei leerer Ausgabe enthält sie
+ *          eine farbige Hinweiszeile, dass keine Branches gefunden wurden.
+ */
 export async function gitBranch(): Promise<string> {
   const result = await runGit(['branch', '-a', '--list', '--color=always'])
 
@@ -226,7 +236,15 @@ export async function gitBranch(): Promise<string> {
   }).join('\n')
 }
 
-// ─── Git Create Branch ───────────────────────────────────────────────
+/**
+ * Erstellt lokal einen neuen Git-Branch mit dem angegebenen Namen.
+ *
+ * @param name - Der Name des zu erstellenden Branches
+ * @returns Eine formatierte Statusmeldung:
+ * - eine Usage-Hinweiszeile (`git branch <name>`) wenn `name` leer ist,
+ * - `"Error: <stderr>"` (farbig formatiert) wenn der Git-Befehl fehlschlägt,
+ * - eine Erfolgsmeldung `✓ Created branch '<name>'` (farbig formatiert) bei erfolgreicher Erstellung
+ */
 export async function gitCreateBranch(name: string): Promise<string> {
   if (!name.trim()) {
     return `${colors.yellow}Usage: git branch <name>${colors.reset}`
@@ -241,7 +259,12 @@ export async function gitCreateBranch(name: string): Promise<string> {
   return `${colors.green}✓ Created branch '${name}'${colors.reset}`
 }
 
-// ─── Git Checkout ─────────────────────────────────────────────────────
+/**
+ * Wechselt zum angegebenen Git-Branch und liefert eine farblich formatierte Ergebnisnachricht.
+ *
+ * @param branch - Name des Branches, zu dem gewechselt werden soll
+ * @returns Eine formatierte Statusmeldung: bei Erfolg eine grüne Bestätigung mit optionaler Git-Ausgabe; bei Fehlern eine rote `Error:`-Zeile mit der Git-Fehlermeldung; wenn `branch` leer ist, eine gelbe Usage-Hinweiszeile
+ */
 export async function gitCheckout(branch: string): Promise<string> {
   if (!branch.trim()) {
     return `${colors.yellow}Usage: git checkout <branch>${colors.reset}`
@@ -256,7 +279,15 @@ export async function gitCheckout(branch: string): Promise<string> {
   return `${colors.green}✓ Switched to branch '${branch}'${colors.reset}\n${result.stdout}`
 }
 
-// ─── Git Merge ───────────────────────────────────────────────────────
+/**
+ * Führt einen Git-Merge des angegebenen Branches durch und liefert eine formatierte Statusnachricht.
+ *
+ * @param branch - Name des Ziel-Branches, der in den aktuellen Branch gemerged werden soll
+ * @returns Eine formatierte Ergebniszeichenfolge:
+ * - Bei leerem `branch` eine Usage-Hinweiszeile ("git merge <branch>").
+ * - Bei Fehlschlag eine Zeile mit `Error:` gefolgt von der Git-Fehlermeldung.
+ * - Bei Erfolg eine Bestätigung "✓ Merged branch '<branch>'" gefolgt von der Ausgabe des Merge-Befehls.
+ */
 export async function gitMerge(branch: string): Promise<string> {
   if (!branch.trim()) {
     return `${colors.yellow}Usage: git merge <branch>${colors.reset}`
@@ -271,7 +302,12 @@ export async function gitMerge(branch: string): Promise<string> {
   return `${colors.green}✓ Merged branch '${branch}'${colors.reset}\n${result.stdout}`
 }
 
-// ─── Git Rebase ──────────────────────────────────────────────────────
+/**
+ * Führt ein Git-Rebase auf den angegebenen Ziel-Branch durch.
+ *
+ * @param branch - Ziel-Branch, auf den das aktuelle Arbeitsverzeichnis rebased werden soll
+ * @returns Eine farbige Statusmeldung: bei Erfolg eine Bestätigung `✓ Rebased onto branch '<branch>'` gefolgt von der Git-Ausgabe; bei Fehlern eine Meldung beginnend mit `Error:` und der Fehlerausgabe; wenn `branch` leer ist, eine Nutzungsanweisung
+ */
 export async function gitRebase(branch: string): Promise<string> {
   if (!branch.trim()) {
     return `${colors.yellow}Usage: git rebase <branch>${colors.reset}`
@@ -286,7 +322,15 @@ export async function gitRebase(branch: string): Promise<string> {
   return `${colors.green}✓ Rebased onto branch '${branch}'${colors.reset}\n${result.stdout}`
 }
 
-// ─── Git Delete Branch ───────────────────────────────────────────────
+/**
+ * Löscht einen lokalen Git-Branch.
+ *
+ * Führt `git branch -d` (oder `-D` wenn erzwungen) aus und gibt eine farbformatierte Ergebnisnachricht zurück.
+ *
+ * @param name - Der Name des zu löschenden Branches
+ * @param force - Falls `true`, erzwingt die Löschung (`-D`) auch bei Änderungen, die nicht zusammengeführt wurden
+ * @returns Eine farbcodierte Nachricht: ein Nutzungs-Hinweis wenn `name` leer ist, eine Fehlerzeile mit `stderr` bei fehlgeschlagenem Git-Aufruf oder eine Erfolgsmeldung bei erfolgreicher Löschung
+ */
 export async function gitDeleteBranch(name: string, force: boolean = false): Promise<string> {
   if (!name.trim()) {
     return `${colors.yellow}Usage: git branch -d <branch>${colors.reset}`
@@ -302,7 +346,16 @@ export async function gitDeleteBranch(name: string, force: boolean = false): Pro
   return `${colors.green}✓ Deleted branch '${name}'${colors.reset}`
 }
 
-// ─── Git Rename Branch ───────────────────────────────────────────────
+/**
+ * Benennt einen vorhandenen Git-Branch um.
+ *
+ * @param oldName - Der aktuelle Name des Branches
+ * @param newName - Der gewünschte neue Name des Branches
+ * @returns Eine formatierte Statusnachricht:
+ * - Bei leerem `oldName` oder `newName`: eine Nutzungshilfe (`git branch -m <old> <new>`)
+ * - Bei einem Fehler des Git-Befehls: `Error:` gefolgt von der farbigen `stderr`-Ausgabe
+ * - Bei Erfolg: `✓ Renamed branch 'oldName' to 'newName'`
+ */
 export async function gitRenameBranch(oldName: string, newName: string): Promise<string> {
   if (!oldName.trim() || !newName.trim()) {
     return `${colors.yellow}Usage: git branch -m <old> <new>${colors.reset}`

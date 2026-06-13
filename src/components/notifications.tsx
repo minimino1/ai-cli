@@ -24,7 +24,10 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | null>(null)
 
 /**
- * Hook to access notification functions
+ * Ermöglicht den Zugriff auf den globalen Notification-Kontext.
+ *
+ * @returns Das `NotificationContextType`-Objekt mit aktuellen Benachrichtigungen und Aktionen (`success`, `error`, `warning`, `info`, `remove`, `clear`).
+ * @throws Error Wenn der Hook außerhalb von `NotificationProvider` verwendet wird.
  */
 export function useNotification(): NotificationContextType {
   const context = useContext(NotificationContext)

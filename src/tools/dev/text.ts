@@ -2,7 +2,15 @@
 // word count, char frequency, readability, diff, similarity, summarize, case conversions
 
 /**
- * Count words, characters, lines, sentences
+ * Ermittelt grundlegende Textstatistiken für einen gegebenen Eingabestring.
+ *
+ * @param str - Der zu analysierende Text
+ * @returns Ein Objekt mit folgenden Metriken:
+ * - `words`: Anzahl der Wörter (Trennung an beliebigen Whitespace-Zeichen)
+ * - `chars`: Anzahl der Zeichen (`str.length`)
+ * - `lines`: Anzahl der Zeilen (Anzahl der Segmente getrennt durch `\n`)
+ * - `sentences`: Anzahl der Sätze (Aufteilung an `[.!?]+`, einfache Heuristik)
+ * - `paragraphs`: Anzahl nicht-leerer Absätze (Trennung an Leerzeilen)
  */
 export function wordCount(str: string): {
   words: number
@@ -25,7 +33,10 @@ export function wordCount(str: string): {
 }
 
 /**
- * Character frequency map
+ * Erstellt eine Häufigkeitskarte der Zeichen in einem String.
+ *
+ * @param str - Der Eingabetext, dessen einzelne Zeichen gezählt werden
+ * @returns Eine Map, die jedem Zeichen seine Anzahl von Vorkommen zuordnet
  */
 export function charFrequency(str: string): Map<string, number> {
   const freq = new Map<string, number>()
@@ -36,8 +47,12 @@ export function charFrequency(str: string): Map<string, number> {
 }
 
 /**
- * Flesch-Kincaid readability score
- * Higher score = easier to read (0-100 scale)
+ * Schätzt die Lesbarkeit eines Texts mit einem Flesch‑Reading‑Ease‑ähnlichen Score.
+ *
+ * Gibt einen numerischen Lesbarkeitswert sowie eine zugeordnete Schul-/Bildungsstufe und eine kurze Interpretation zurück.
+ * Bei leerem oder unzureichendem Text wird `score` auf `0`, `grade` auf `'N/A'` und `interpretation` auf eine passende Hinweisnachricht gesetzt.
+ *
+ * @returns `score` — Lesbarkeitswert von 0 bis 100 (höher = leichter lesbar); `grade` — angenäherte Schul-/Bildungsstufe als String; `interpretation` — kurze Erläuterung der Lesbarkeit
  */
 export function readabilityScore(str: string): {
   score: number
@@ -98,7 +113,12 @@ export function readabilityScore(str: string): {
 }
 
 /**
- * Count syllables in text (approximate)
+ * Schätzt die Anzahl der Silben in einem Text.
+ *
+ * Liefert eine ungefähre Silbenanzahl; nicht phonologisch exakt. Nicht-buchstabige Zeichen werden vor der Auswertung entfernt und einfache Heuristiken (z. B. Zählen von Vokalgruppen, Behandlung endendem `e` und `le`-Endungen) verwendet.
+ *
+ * @param text - Der Eingabetext; Wörter werden anhand von Leerraum getrennt
+ * @returns Die geschätzte Gesamtanzahl der Silben im Text
  */
 function countSyllables(text: string): number {
   let count = 0
@@ -131,8 +151,13 @@ function countSyllables(text: string): number {
 }
 
 /**
- * Line-by-line diff between two texts
- * Returns unified diff format
+ * Ermittelt zeilenweise Unterschiede zwischen zwei Texten und erzeugt eine Hunk- sowie eine Unified-diff-Darstellung.
+ *
+ * Liefert eine Liste von Hunks, in denen für jede Änderung die Startpositionen und die jeweils entfernten/neu hinzugefügten Zeilen enthalten sind, sowie eine zusammengeführte Unified-diff-Stringdarstellung.
+ *
+ * @returns Ein Objekt mit zwei Feldern:
+ *  - `hunks`: Array von Änderungen; jedes Hunk hat `oldStart` (1-basierte Startzeile in der Originaldatei), `newStart` (1-basierte Startzeile in der modifizierten Datei), `oldLines` (entfernte Zeilen) und `newLines` (hinzugefügte Zeilen).
+ *  - `unified`: Die Diff-Ausgabe im Unified-Diff-Format als einzelner String (mehrere Zeilen durch `\n` getrennt).
  */
 export function diffText(a: string, b: string): {
   hunks: Array<{
@@ -227,7 +252,11 @@ export function diffText(a: string, b: string): {
 }
 
 /**
- * Longest Common Subsequence (LCS) indices
+ * Bestimmt die Indizes der Elemente in `a`, die zu einer längsten gemeinsamen Teilfolge (LCS) mit `b` gehören.
+ *
+ * @param a - Erstes Array von Zeichenketten zur Vergleichsgrundlage
+ * @param b - Zweites Array von Zeichenketten, gegen das `a` verglichen wird
+ * @returns Ein Array mit den Indizes aus `a` (in aufsteigender Reihenfolge), die Teil einer längsten gemeinsamen Teilfolge zwischen `a` und `b` sind
  */
 function longestCommonSubsequence(a: string[], b: string[]): number[] {
   const m = a.length
@@ -263,7 +292,14 @@ function longestCommonSubsequence(a: string[], b: string[]): number[] {
 }
 
 /**
- * Levenshtein distance (similarity)
+ * Berechnet die Levenshtein-Edit-Distanz zwischen zwei Zeichenketten und leitet daraus normalisierte Ähnlichkeitswerte ab.
+ *
+ * @param a - Erste Zeichenkette
+ * @param b - Zweite Zeichenkette
+ * @returns Ein Objekt mit den Feldern:
+ *  - `distance`: die minimale Anzahl von Einfüge-, Lösch- oder Ersetzoperationen, um `a` in `b` zu verwandeln
+ *  - `similarity`: der ungerundete Ähnlichkeitswert im Bereich [0, 1] (1 = identisch), berechnet als `1 - distance / maxLen`
+ *  - `normalized`: derselbe Ähnlichkeitswert auf drei Dezimalstellen gerundet
  */
 export function similarity(a: string, b: string): {
   distance: number
@@ -305,7 +341,15 @@ export function similarity(a: string, b: string): {
 }
 
 /**
- * Extractive text summarization (simple sentence scoring)
+ * Erstellt eine kurze extraktive Zusammenfassung durch Auswahl und Bewertung von Sätzen.
+ *
+ * Wählt die besten `sentenceCount` Sätze basierend auf Worthäufigkeiten im Text (kurze Wörter mit Länge ≤ 3 werden ignoriert)
+ * und gibt diese in ihrer ursprünglichen Reihenfolge zusammengefügt zurück. Der erste und der letzte Satz erhalten
+ * eine leichte Gewichtung, um einführende und abschließende Sätze zu bevorzugen. Wenn der Text bereits aus
+ * höchstens `sentenceCount` Sätzen besteht, wird der Originaltext unverändert zurückgegeben.
+ *
+ * @param sentenceCount - Anzahl der Sätze, die in der Zusammenfassung enthalten sein sollen (Standard: 3)
+ * @returns Die extraktive Zusammenfassung als zusammengefügte Sätze
  */
 export function summarize(str: string, sentenceCount: number = 3): string {
   const sentences = str.match(/[^.!?]+[.!?]+/g) || [str]

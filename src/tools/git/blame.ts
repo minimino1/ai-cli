@@ -38,7 +38,16 @@ const colors = {
   dim: '\x1b[2m',
 }
 
-// ─── Run Git Command ───────────────────────────────────────────────
+/**
+ * Führt `git` mit den angegebenen Argumenten aus und sammelt stdout, stderr und den Exit-Code.
+ *
+ * @param args - Die Argumente, die an `git` übergeben werden (z. B. `['blame', '--line-porcelain', 'path']`)
+ * @returns Ein Objekt mit:
+ *  - `success`: `true`, wenn der Exit-Code `0` ist, sonst `false`
+ *  - `exitCode`: der numerische Exit-Code des Prozesses
+ *  - `stdout`: der getrimmte Standardausgabe-Text
+ *  - `stderr`: der getrimmte Standardfehler-Text
+ */
 async function runGit(args: string[]): Promise<GitResult> {
   const subprocess = Bun.spawn({
     program: 'git',
@@ -84,7 +93,16 @@ async function runGit(args: string[]): Promise<GitResult> {
   return { success: exitCode === 0, exitCode, stdout: stdout.trim(), stderr: stderr.trim() }
 }
 
-// ─── Parse Blame Output ─────────────────────────────────────────────
+/**
+ * Parst eine einzelne Zeile der Standardausgabe von `git blame` und liefert die strukturierte Blame-Information.
+ *
+ * Erwartet die Standardblame-Zeile im Format:
+ * `<commit-hash> (author date time) <line-number> <content>`. Gibt `null` zurück, wenn die Zeile nicht dem erwarteten Format entspricht.
+ *
+ * @param line - Die rohe Ausgabezeile von `git blame`
+ * @param lineNum - Die Quellcodezeilennummer, die dem Eintrag zugewiesen werden soll
+ * @returns Ein `BlameLine`-Objekt mit gekürztem Commit-Hash (8 Zeichen), Autor (oder `'Unknown'`), Datum und Inhalt, oder `null` wenn die Zeile nicht geparst werden konnte
+ */
 function parseBlameLine(line: string, lineNum: number): BlameLine | null {
   // Git blame default format: <commit-hash> (<author> <date> <time>) <line-number> <content>
   // Example: 5e2a3b4 (John Doe 2024-01-15 10:30:15 +0000 1)  import React from 'react'
@@ -113,7 +131,13 @@ function parseBlameLine(line: string, lineNum: number): BlameLine | null {
 
 // ─── Blame File ─────────────────────────────────────────────────────
 /**
- * Get line-by-line blame for a file
+ * Gibt eine formatierte, zeilenweise Git‑Blame‑Ansicht für die angegebene Datei zurück.
+ *
+ * Liefert eine tabellarische Textausgabe mit Kopfzeile und pro Eintrag Zeilennummer, kurzem Commit‑Hash, Autor, Datum und Quelltextzeile.
+ * Bei einem Git‑Fehler wird eine eingefärbte Fehlermeldung mit dem `stderr`‑Inhalt zurückgegeben; wenn keine Blame‑Daten vorhanden oder nicht parsbar sind, wird eine eingefärbte Hinweisnachricht zurückgegeben.
+ *
+ * @param filePath - Pfad zur Datei im Repository, für die die Blame‑Informationen ermittelt werden sollen
+ * @returns Die formatierte Blame‑Ausgabe oder eine eingefärbte Fehl-/Hinweismeldung als Text
  */
 export async function blame(filePath: string): Promise<string> {
   const result = await runGit(['blame', '--line-porcelain', filePath])
@@ -188,7 +212,10 @@ export async function blame(filePath: string): Promise<string> {
 
 // ─── Blame Summary ──────────────────────────────────────────────────
 /**
- * Get blame summary grouped by author
+ * Erstellt eine autorbasierte Zusammenfassung der Zeilenverantwortlichkeiten für eine Datei.
+ *
+ * @param filePath - Pfad zur Datei, für die die Blame-Informationen ermittelt werden
+ * @returns Eine formatierte, ANSI-farbige Texttabelle mit pro‑Autor Zeilenzahlen, Prozentsatz und Anzahl verschiedener Commits; oder eine farbige Fehl‑/Hinweismeldung, falls keine Daten verfügbar sind
  */
 export async function blameSummary(filePath: string): Promise<string> {
   const result = await runGit(['blame', '--line-porcelain', filePath])
@@ -263,7 +290,12 @@ export async function blameSummary(filePath: string): Promise<string> {
 
 // ─── Blame Date Range ───────────────────────────────────────────────
 /**
- * Get blame for a specific date range
+ * Erzeugt eine formatierte Blame-Ansicht für eine Datei innerhalb eines angegebenen Datumsbereichs.
+ *
+ * @param filePath - Pfad zur Datei, für die die Blame-Informationen ermittelt werden
+ * @param since - Startdatum / -zeit für die Filterung (git-kompatibler Datumsstring)
+ * @param until - Optionales Enddatum / -zeit für die Filterung (git-kompatibler Datumsstring)
+ * @returns Einen formatierten Text mit pro Zeile zugeordneten Blame-Informationen (oder einer farbigen Fehl-/Hinweismeldung, wenn keine Daten vorhanden oder ein Fehler aufgetreten ist)
  */
 export async function blameDateRange(filePath: string, since: string, until?: string): Promise<string> {
   const args = ['blame', '--line-porcelain', '--since', since]

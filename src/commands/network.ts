@@ -9,7 +9,13 @@ import { scan as portScan, scanCommon as scanCommonPorts, formatPortScan } from 
 import { checkCert as checkSSLCert, checkExpiry as checkSSLExpiry, verifyChain, formatCertInfo } from '../tools/network/ssl'
 
 /**
- * Parse key=value options from command args
+ * Parst eine durch Leerzeichen getrennte CLI-Zeichenkette in Befehl, URL und Schlüssel‑Wert‑Optionen.
+ *
+ * @param args - Die gesamte Argumentzeile (z. B. "cmd example.com --flag value --switch").
+ * @returns Ein Objekt mit:
+ *  - `command`: erstes Token der Zeile,
+ *  - `url`: zweites Token oder leerer String,
+ *  - `options`: eine Map von Optionenschlüsseln (ohne führende `--`) auf ihre Werte; steht einer Option kein Wert unmittelbar nach (oder folgt ein weiteres `--`), wird der Wert `"true"` gesetzt.
  */
 function parseOptions(args: string): { command: string; url: string; options: Record<string, string> } {
   const parts = args.trim().split(/\s+/)

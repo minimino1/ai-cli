@@ -24,7 +24,12 @@ const DOH_ENDPOINTS = {
 }
 
 /**
- * Resolve DNS records
+ * Löst DNS-Einträge für eine Domain und liefert strukturierte Ergebnisse.
+ *
+ * @param domain - Die zu überprüfende Domain
+ * @param type - Gewünschter DNS-Recordtyp (z. B. `'A'`, `'MX'`, `'TXT'`); Standard ist `'A'`
+ * @returns Ein Objekt mit dem abgefragten `domain`-Namen, einem Array von `DNSRecord` (inklusive `ttl` und bei MX-Einträgen `priority`) und `queryTime` in Millisekunden
+ * @throws Wirft den ursprünglichen Fehler, wenn die native DNS-Auflösung mit einem anderen Fehler als `ENOTFOUND` oder `EAI_AGAIN` fehlschlägt
  */
 export async function resolve(domain: string, type: DNSRecordType = 'A'): Promise<DNSResponse> {
   const startTime = Date.now()
@@ -74,7 +79,12 @@ export async function resolve(domain: string, type: DNSRecordType = 'A'): Promis
 }
 
 /**
- * DNS-over-HTTPS lookup (fallback)
+ * Führt eine DNS-over-HTTPS-Abfrage durch und versucht dabei nacheinander Cloudflare und Google als Fallback-Anbieter.
+ *
+ * @param domain - Der zu überprüfende Domainname
+ * @param type - Gewünschter DNS-Recordtyp (z. B. `A`, `MX`, `PTR`)
+ * @returns Ein Objekt mit dem abgefragten Domainnamen, den gefundenen DNS-Einträgen und der Abfragezeit in Millisekunden
+ * @throws Error wenn alle DoH-Anbieter fehlschlagen (Nachricht: `DNS lookup failed for ${domain} (${type})`)
  */
 async function resolveDOH(domain: string, type: DNSRecordType): Promise<DNSResponse> {
   const startTime = Date.now()
@@ -128,7 +138,13 @@ async function resolveDOH(domain: string, type: DNSRecordType): Promise<DNSRespo
 }
 
 /**
- * Reverse DNS lookup (PTR)
+ * Führt eine Reverse-DNS-Abfrage (PTR) für eine IPv4- oder IPv6-Adresse durch.
+ *
+ * Die Funktion validiert die übergebene IP und löst anschließend die zugehörige PTR-Domain auf.
+ *
+ * @param ip - Die IPv4- oder IPv6-Adresse, für die die Reverse-Abfrage durchgeführt wird
+ * @returns Ein `DNSResponse` mit den gefundenen PTR-Einträgen für die Reverse-Domain
+ * @throws Error wenn `ip` kein gültiges IPv4- oder IPv6-Format hat
  */
 export async function reverseLookup(ip: string): Promise<DNSResponse> {
   // Validate IP format
@@ -157,7 +173,14 @@ export async function reverseLookup(ip: string): Promise<DNSResponse> {
 }
 
 /**
- * Check DNS propagation across multiple resolvers
+ * Prüft die DNS-Verbreitung eines Domain-Namens bei mehreren öffentlichen Resolvern.
+ *
+ * Führt für jeden konfigurierten Resolver eine DoH-Abfrage durch und sammelt die jeweiligen Antworten oder Fehlermeldungen.
+ *
+ * @returns Eine Liste mit Ergebnissen pro Resolver. Jeder Eintrag enthält:
+ * - `resolver`: der Anzeigename des Resolvers
+ * - `response`: das `DNSResponse`-Objekt (bei Fehlern enthält `records` ein leeres Array und `queryTime` ist `0`)
+ * - `error` (optional): die Fehlermeldung, falls die Abfrage fehlgeschlagen ist
  */
 export async function checkPropagation(domain: string, type: DNSRecordType = 'A'): Promise<Array<{ resolver: string; response: DNSResponse; error?: string }>> {
   const resolvers = [
@@ -184,7 +207,11 @@ export async function checkPropagation(domain: string, type: DNSRecordType = 'A'
 }
 
 /**
- * Resolve using specific DNS-over-HTTPS resolver
+ * Führt eine DNS-over-HTTPS-Abfrage gegen einen spezifischen Resolver durch und gibt die gefilterten Antworten zurück.
+ *
+ * @param server - Hostname oder IP des DoH-Servers (verwendet als https://{server}/dns-query)
+ * @returns Ein `DNSResponse` mit `domain`, nur den Antworten vom angeforderten `type` in `records` und `queryTime` in Millisekunden
+ * @throws Error wenn die HTTP-Antwort nicht-OK ist oder die Abfrage/Antwortverarbeitung fehlschlägt; die Fehlermeldung enthält Details
  */
 async function resolveDOHWithResolver(domain: string, type: DNSRecordType, server: string): Promise<DNSResponse> {
   const startTime = Date.now()
@@ -229,7 +256,10 @@ async function resolveDOHWithResolver(domain: string, type: DNSRecordType, serve
 }
 
 /**
- * Convert DNS type number to string
+ * Wandelt einen numerischen DNS-RR-Typcode in seinen stringbasierten Typnamen um.
+ *
+ * @param type - Numerischer DNS-RR-Typcode (z. B. `1` für `A`, `28` für `AAAA`)
+ * @returns Den typischen DNS-Typnamen (z. B. `A`, `MX`) oder `'UNKNOWN'`, wenn der Code nicht bekannt ist
  */
 function dnsTypeToString(type: number): string {
   const types: Record<number, string> = {
@@ -267,7 +297,10 @@ function dnsTypeToString(type: number): string {
 }
 
 /**
- * Format DNS response for display
+ * Erzeugt eine menschenlesbare, mehrzeilige Darstellung einer DNS-Antwort.
+ *
+ * @param response - Die zu formatierende DNS-Antwort
+ * @returns Eine mehrzeilige Zeichenkette mit Domain, Abfragezeit, Anzahl gefundener Einträge und für jeden Eintrag eine Zeile mit Typ, optionaler Priorität, optionaler TTL und dem Wert
  */
 export function formatDNSResponse(response: DNSResponse): string {
   const lines: string[] = []

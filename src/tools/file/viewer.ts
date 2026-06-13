@@ -13,7 +13,13 @@ export interface ViewResult {
 }
 
 /**
- * Auto-detect format from extension and content
+ * Ermittelt das wahrscheinliche Format eines Textinhalts anhand des Dateipfads und des Inhalts.
+ *
+ * Verwendet zuerst die Dateiendung/den Dateinamen als Hinweis und fällt bei unbekannter oder fehlender Endung auf einfache inhaltliche Muster (z. B. JSON-, YAML- oder CSV-Charakteristika) zurück.
+ *
+ * @param filePath - Der Dateipfad oder -name, der für die Auswertung der Erweiterung und des Namens verwendet wird
+ * @param content - Der Dateiinhalt, der auf charakteristische Muster zur genaueren Formatbestimmung untersucht wird
+ * @returns Eines der Format-Labels: 'json', 'yaml', 'csv', 'markdown', 'log', 'hex' oder 'text'
  */
 export function detectFormat(filePath: string, content: string): string {
   const ext = extname(filePath).toLowerCase()
@@ -56,7 +62,13 @@ export function detectFormat(filePath: string, content: string): string {
 }
 
 /**
- * View JSON with syntax highlighting
+ * Gibt den JSON-Inhalt formatiert und mit ANSI-Syntaxhervorhebung zurück.
+ *
+ * Wenn `content` gültiges JSON ist, wird er schön eingerückt und farblich hervorgehoben.
+ * Bei ungültigem JSON wird eine rot gefärbte Fehlermeldung ausgegeben, gefolgt vom ursprünglichen Inhalt.
+ *
+ * @param content - Der rohe JSON-Text
+ * @returns Den formatierten und farblich markierten JSON-Text oder bei Fehlern eine rot gefärbte Fehlermeldung gefolgt vom Originalinhalt
  */
 export function viewJSON(content: string): string {
   try {
@@ -68,6 +80,14 @@ export function viewJSON(content: string): string {
   }
 }
 
+/**
+ * Hebt JSON-Quelltext mit ANSI-Farbcodes für die Terminalausgabe hervor.
+ *
+ * Verwendet Farben für JSON-Strings, Objekt-Schlüssel, Booleans, `null` und Zahlen.
+ *
+ * @param json - Der zu kolorierende JSON-Text (idealerweise bereits formatiert)
+ * @returns Den Eingabetext mit eingefügten ANSI-Escape-Sequenzen zur farbigen Hervorhebung von JSON-Tokens
+ */
 function syntaxHighlightJSON(json: string): string {
   return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
     let cls = '\x1b[36m' // cyan for strings
@@ -87,7 +107,10 @@ function syntaxHighlightJSON(json: string): string {
 }
 
 /**
- * View YAML with syntax highlighting
+ * Gibt YAML-Inhalt mit ANSI-Syntaxhervorhebung für Schlüssel und Werte zurück.
+ *
+ * @param content - Der rohe YAML-Text
+ * @returns Der Eingabetext mit ANSI-Farbcodes zur Hervorhebung von Schlüsseln, `true`/`false`/`null`-Werten, Zahlen und einfachen/doppelten Zeichenketten
  */
 export function viewYAML(content: string): string {
   const lines = content.split('\n')
@@ -109,7 +132,12 @@ export function viewYAML(content: string): string {
 }
 
 /**
- * View CSV as formatted table
+ * Stellt CSV-Inhalt als formatiertes ASCII-Tableau mit ANSI-Farben dar.
+ *
+ * Verwendet die erste Zeile als Kopfzeile, richtet Spalten auf eine Mindestbreite von 10 Zeichen aus und fügt am Ende eine graue Fußzeile mit der Anzahl der Datenzeilen und Spalten hinzu. Der CSV-Parser ist einfach und behandelt keine in Anführungszeichen eingeschlossenen Kommata.
+ *
+ * @param content - Der rohe CSV-Text (Zeilen durch `\n`, Spalten durch `,`)
+ * @returns Den gerenderten, ANSI-farbigen Tabellen-String (inkl. Kopfzeile, Trennzeile, Datenzeilen und Fußzeile); bei leerem Inhalt eine rote `Empty CSV`-Nachricht
  */
 export function viewCSV(content: string): string {
   const lines = content.trim().split('\n')
@@ -152,12 +180,25 @@ export function viewCSV(content: string): string {
   return output.join('\n')
 }
 
+/**
+ * Füllt einen String rechts mit Leerzeichen auf, sodass seine Länge mindestens der angegebenen Breite beträgt.
+ *
+ * @param str - Der zu formatierende String
+ * @param width - Gewünschte Mindestbreite des zurückgegebenen Strings; bleibt `str` unverändert, wenn dessen Länge bereits größer oder gleich ist
+ * @returns Den String, der rechts mit Leerzeichen auf die Mindestbreite aufgefüllt wurde
+ */
 function padRight(str: string, width: number): string {
   return str.padEnd(width, ' ')
 }
 
 /**
- * View Markdown with basic formatting
+ * Rendert einfachen Markdown-Text zu farbiger ANSI-Terminalausgabe.
+ *
+ * Unterstützt Überschriften (#, ##, ###), fett (`**...**`), kursiv (`*...*`), Inline-Code (`` `...` ``),
+ * Links (`[text](url)`), Listen und Blockzitate; ersetzt Markdown-Syntax durch ANSI-Farbcodes.
+ *
+ * @param content - Der Markdown-Quelltext
+ * @returns Den gerenderten Text mit ANSI-Farbcodes, geeignet für die Anzeige in einem Terminal
  */
 export function viewMarkdown(content: string): string {
   const lines = content.split('\n')
@@ -209,7 +250,18 @@ export function viewMarkdown(content: string): string {
 }
 
 /**
- * View log with colored log levels
+ * Formatiert Log-Text mit ANSI-Farbcodierung für Log-Level und Zeitstempel.
+ *
+ * Markiert erkennbare Log-Level und bestimmte Token mit Farben, z. B.:
+ * - `DEBUG`/`TRACE`: cyan
+ * - `INFO`: grün
+ * - `WARN`/`WARNING`: gelb
+ * - `ERROR`/`FATAL`/`CRITICAL`: rot
+ * - `HTTP/1xx`/`HTTP/2xx`: cyan
+ * - ISO‑ähnliche Zeitstempel (z. B. 2023-01-01T12:00:00Z): grau
+ *
+ * @param content - Der rohe Log-Text (mehrere Zeilen)
+ * @returns Den Log-Text mit ANSI-Farbcodes zur Hervorhebung der genannten Token
  */
 export function viewLog(content: string): string {
   const lines = content.split('\n')
@@ -235,7 +287,12 @@ export function viewLog(content: string): string {
 }
 
 /**
- * View hex dump
+ * Erzeugt eine klassische Hex-Dump-Darstellung aus dem gegebenen Text.
+ *
+ * Die Ausgabe enthält pro Zeile den hexadezimalen Offset, die Hex-Bytes und eine druckbare ASCII-Spalte sowie eine Fußzeile mit der Gesamtzahl der Bytes.
+ *
+ * @param content - Eingabedaten als UTF‑8-kodierter String, die als Bytefolge dargestellt werden sollen
+ * @returns Die formatierte Hex-Dump-Zeichenkette (Offset, Hex-Bytes, ASCII-Spalte und Gesamtbytes)
  */
 export function viewHex(content: string): string {
   const bytes = Buffer.from(content, 'utf-8')
@@ -260,7 +317,10 @@ export function viewHex(content: string): string {
 }
 
 /**
- * Main viewer function - auto-detect and render
+ * Ermittelt das Format einer Datei, rendert ihren Inhalt für die Terminal-Ausgabe und liefert Format, gerenderten Text sowie einfache Metadaten.
+ *
+ * @param filePath - Pfad zur Datei, die gelesen und gerendert werden soll
+ * @returns Ein ViewResult mit `format` (erkanntes Format), `content` (gerenderte, terminal-farbige Darstellung oder Rohtext) und optionalem `metadata`-Objekt mit `rows` (Anzahl Zeilen) und `cols` (maximale Zeilenlänge)
  */
 export async function viewFile(filePath: string): Promise<ViewResult> {
   const content = await readFile(filePath, 'utf-8')
@@ -302,7 +362,11 @@ export async function viewFile(filePath: string): Promise<ViewResult> {
 }
 
 /**
- * View content directly (without file)
+ * Rendert einen Textinhalt für die Anzeige und erkennt das Format automatisch oder verwendet einen Hinweis.
+ *
+ * @param content - Zu rendernder roher Textinhalt
+ * @param formatHint - Optionaler Hinweis auf das Format (z. B. "json", "yaml", "csv", "markdown", "log", "hex"); wenn nicht gesetzt, wird das Format aus Inhalt/Dateiname ermittelt
+ * @returns Ein ViewResult mit dem erkannten oder verwendeten `format`, dem gerenderten `content` und `metadata` mit `rows` (Anzahl Zeilen) und `cols` (Länge der längsten Zeile)
  */
 export function viewContent(content: string, formatHint?: string): ViewResult {
   const format = formatHint || detectFormat('', content)

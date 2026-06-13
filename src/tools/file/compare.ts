@@ -41,7 +41,13 @@ export interface CompareDirsResult {
 }
 
 /**
- * Calculate MD5 hash of a file
+ * Erzeugt einen MD5-Hash des gesamten Inhalts der angegebenen Datei.
+ *
+ * Liest die Datei vollständig als Buffer und gibt den Hash als hexadezimale Zeichenkette zurück.
+ *
+ * @param filePath - Pfad zur Quelldatei
+ * @returns Die MD5-Prüfsumme der Datei als hexadezimale Zeichenkette
+ * @throws Fehler beim Lesen der Datei (z. B. wenn die Datei nicht existiert oder nicht lesbar ist)
  */
 export async function fileHash(filePath: string): Promise<string> {
   const content = await readFile(filePath)
@@ -49,7 +55,13 @@ export async function fileHash(filePath: string): Promise<string> {
 }
 
 /**
- * Line-by-line diff between two files
+ * Ermittelt die zeilenweisen Unterschiede zwischen zwei Dateien und fasst zusammenhängende Änderungen als Hunks.
+ *
+ * Liest beide Dateien, bildet Hunk-Bereiche mit Änderungs-Offsets und berechnet aggregierte Statistiken.
+ *
+ * @param file1 - Pfad zur ersten Datei (ältere/erste Version)
+ * @param file2 - Pfad zur zweiten Datei (neuere/zweite Version)
+ * @returns Ein `DiffResult` mit `hunks` sowie den Summen `totalAdded`, `totalRemoved` und `totalChanged`
  */
 export async function diffFiles(file1: string, file2: string): Promise<DiffResult> {
   const [content1, content2] = await Promise.all([
@@ -153,7 +165,11 @@ export async function diffFiles(file1: string, file2: string): Promise<DiffResul
 }
 
 /**
- * Format diff with colors (ANSI escape codes)
+ * Erzeugt eine textuelle Darstellung eines Diffs mit optionalen ANSI-Farbcodes.
+ *
+ * @param diff - Das Diff-Ergebnis mit Hunks sowie den Summenzählern für hinzugefügte, entfernte und geänderte Zeilen
+ * @param useColors - Wenn `true` werden ANSI-Farbcodes für hinzugefügte, entfernte und Kontextzeilen eingefügt; bei `false` wird reine Textausgabe erzeugt
+ * @returns Die formatierte Diff-Darstellung als String; enthält ANSI-Escape-Sequenzen, wenn `useColors` gesetzt ist
  */
 export function formatDiff(diff: DiffResult, useColors: boolean = true): string {
   const lines: string[] = []
@@ -199,14 +215,27 @@ export function formatDiff(diff: DiffResult, useColors: boolean = true): string 
 let lines1: string[] = []
 let lines2: string[] = []
 
-// Store lines globally for formatDiff (simplified approach)
+/**
+ * Legt die Modul-globalen Zeilenarrays fest, die von formatDiff zum Rendern eines Diffs verwendet werden.
+ *
+ * @param l1 - Zeilen der ersten Datei
+ * @param l2 - Zeilen der zweiten Datei
+ */
 function setLinesForFormatting(l1: string[], l2: string[]) {
   lines1 = l1
   lines2 = l2
 }
 
 /**
- * Compare two directories
+ * Vergleicht rekursiv die Struktur und Inhalte zweier Verzeichnisse.
+ *
+ * @param dir1 - Pfad zum ersten Verzeichnis (absolut oder relativ); ein optionaler abschließender Schrägstrich wird ignoriert
+ * @param dir2 - Pfad zum zweiten Verzeichnis (absolut oder relativ); ein optionaler abschließender Schrägstrich wird ignoriert
+ * @returns Ein Objekt mit den Vergleichsergebnissen:
+ * - `onlyInDir1`: relative Pfade, die nur in `dir1` existieren
+ * - `onlyInDir2`: relative Pfade, die nur in `dir2` existieren
+ * - `different`: Array von `{ path, reason }`, wobei `reason` einer von `'size' | 'content' | 'permissions'` ist
+ * - `identical`: relative Pfade, deren Größe und Inhalt übereinstimmen
  */
 export async function compareDirs(dir1: string, dir2: string): Promise<CompareDirsResult> {
   const result: CompareDirsResult = {
@@ -275,7 +304,10 @@ export async function compareDirs(dir1: string, dir2: string): Promise<CompareDi
 }
 
 /**
- * Find duplicate files by hash
+ * Findet Dateien mit identischem Inhalt (gleicher MD5-Hash) rekursiv unterhalb des angegebenen Pfads.
+ *
+ * @param path - Verzeichnis, das rekursiv durchsucht wird
+ * @returns Eine Array von DuplicateGroup-Objekten; jede Gruppe enthält einen `hash` und eine `files`-Liste mit mindestens zwei Einträgen (relative `path`, `size`, `modified`). Nur Gruppen mit mehr als einer Datei werden zurückgegeben. Die Gruppen sind nach Dateigröße absteigend sortiert (größte zuerst). Unlesbare oder nicht zugängliche Dateien werden stillschweigend übersprungen.
  */
 export async function findDuplicates(path: string): Promise<DuplicateGroup[]> {
   const files = await listFilesRecursive(path)
@@ -318,7 +350,13 @@ export async function findDuplicates(path: string): Promise<DuplicateGroup[]> {
 }
 
 /**
- * Recursively list all files
+ * Gibt alle Dateien unter einem Verzeichnis rekursiv zurück, als Map von relativen zu vollständigen Pfaden.
+ *
+ * Versteckte Einträge (Namen, die mit `.` beginnen) werden übersprungen. Verzeichnisse, die nicht gelesen werden
+ * können, werden stillschweigend übersprungen.
+ *
+ * @param dir - Basisverzeichnis; relative Pfade in der Rückgabe sind relativ zu diesem Verzeichnis
+ * @returns Eine Map, deren Schlüssel der relative Pfad (relativ zu `dir`) und dessen Wert der vollständige Pfad ist
  */
 async function listFilesRecursive(dir: string): Promise<Map<string, string>> {
   const files = new Map<string, string>()
@@ -353,7 +391,14 @@ async function listFilesRecursive(dir: string): Promise<Map<string, string>> {
 import { readdirSync, statSync } from 'fs'
 
 /**
- * Sync version of diffFiles
+ * Erzeugt eine zeilenbasierte Differenz zwischen zwei Dateien im synchronen Modus.
+ *
+ * Liefert die erkannten Hunks (Bereiche mit Änderungen) sowie aggregierte Zählungen
+ * von hinzugefügten, entfernten und veränderten Zeilen.
+ *
+ * @param file1 - Pfad zur ersten (alte) Datei
+ * @param file2 - Pfad zur zweiten (neuen) Datei
+ * @returns Ein `DiffResult` mit `hunks` und den Summen `totalAdded`, `totalRemoved` und `totalChanged`
  */
 export function diffFilesSync(file1: string, file2: string): DiffResult {
   const content1 = readFileSync(file1, 'utf-8')
